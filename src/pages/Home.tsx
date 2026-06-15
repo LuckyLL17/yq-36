@@ -3,12 +3,14 @@ import { ControlPanel } from '@/components/ControlPanel';
 import { Scene3D } from '@/components/Scene3D';
 import { Toolbar } from '@/components/Toolbar';
 import { UVPreview } from '@/components/UVPreview';
+import { ExportDialog } from '@/components/ExportDialog';
 import { ViewMode } from '@/types/castle';
 import { useCastleStore } from '@/store/useCastleStore';
 
 export default function Home() {
   const [viewMode, setViewMode] = useState<ViewMode>('solid');
   const [showUVPreview, setShowUVPreview] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
   const { params } = useCastleStore();
 
   const handleViewModeChange = (mode: ViewMode) => {
@@ -17,7 +19,7 @@ export default function Home() {
   };
 
   const handleExport = () => {
-    alert('导出功能开发中...');
+    setShowExportDialog(true);
   };
 
   return (
@@ -47,6 +49,11 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      <ExportDialog
+        open={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+      />
     </div>
   );
 }

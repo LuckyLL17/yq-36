@@ -22,11 +22,13 @@ const defaultParams: CastleParams = {
 export const useCastleStore = create<CastleState>((set) => ({
   params: defaultParams,
   viewMode: 'solid',
+  castleGeometries: null,
   setParams: (newParams) =>
     set((state) => ({
       params: { ...state.params, ...newParams },
     })),
   setViewMode: (mode: ViewMode) => set({ viewMode: mode }),
+  setCastleGeometries: (geometries) => set({ castleGeometries: geometries }),
   resetParams: () => set({ params: defaultParams }),
   randomizeSeed: () =>
     set((state) => ({

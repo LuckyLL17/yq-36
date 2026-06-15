@@ -1,10 +1,11 @@
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { CastleParams } from '@/types/castle';
 import { CastleGenerator } from '@/utils/CastleGenerator';
 import { MaterialFactory } from '@/utils/MaterialFactory';
-import { UVUnwrapper } from '@/utils/UVUnwrapper';
+import { UVUnwrapper, UVIsland } from '@/utils/UVUnwrapper';
+import { useCastleStore } from '@/store/useCastleStore';
 
 interface CastleProps {
   params: CastleParams;
@@ -13,27 +14,46 @@ interface CastleProps {
 
 export function Castle({ params, viewMode }: CastleProps) {
   const groupRef = useRef<THREE.Group>(null);
+  const setCastleGeometries = useCastleStore((state) => state.setCastleGeometries);
 
-  const { walls, towers, gate, moat, buildings, ground } = useMemo(() => {
+  const { walls, towers, gate, moat, buildings, ground, uvIslands } = useMemo(() => {
     const generator = new CastleGenerator(params);
     const result = generator.generateAll();
     
+    const islands: UVIsland[] = [];
+    
     result.walls.forEach((geo, i) => {
-      UVUnwrapper.unwrapGeometry(geo, `wall_${i}`);
+      const island = UVUnwrapper.unwrapGeometry(geo, `wall_${i}`);
+      islands.push(island);
     });
     result.towers.forEach((geo, i) => {
-      UVUnwrapper.unwrapGeometry(geo, `tower_${i}`);
+      const island = UVUnwrapper.unwrapGeometry(geo, `tower_${i}`);
+      islands.push(island);
     });
-    UVUnwrapper.unwrapGeometry(result.gate, 'gate');
+    islands.push(UVUnwrapper.unwrapGeometry(result.gate, 'gate'));
     if (result.moat) {
-      UVUnwrapper.unwrapGeometry(result.moat, 'moat');
+      islands.push(UVUnwrapper.unwrapGeometry(result.moat, 'moat'));
     }
     result.buildings.forEach((geo, i) => {
-      UVUnwrapper.unwrapGeometry(geo, `building_${i}`);
+      const island = UVUnwrapper.unwrapGeometry(geo, `building_${i}`);
+      islands.push(island);
     });
     
-    return result;
+    UVUnwrapper.packIslands(islands, 0.03);
+    
+    return { ...result, uvIslands: islands };
   }, [params]);
+
+  useEffect(() => {
+    setCastleGeometries({
+      walls,
+      towers,
+      gate,
+      moat,
+      buildings,
+      ground,
+    });
+  }, [walls, towers, gate, moat, buildings, ground, setCastleGeometries]);
 
   const getMaterial = (type: 'stone' | 'wood' | 'roof' | 'ground' | 'water') => {
     if (viewMode === 'wireframe') {
@@ -65,24 +85,24 @@ export function Castle({ params, viewMode }: CastleProps) {
   return (
     <group ref={groupRef}>
       {walls.map((geo, i) => (
-        <mesh key={`wall_${i}`} geometry={geo} material={getMaterial('stone')} castShadow receiveShadow />
+        <mesh key={`wall_${i}`} geometry={geo} material={getMaterial('stone')} castShadow receiveShadow name={`wall_${i}`} />
       ))}
       
       {towers.map((geo, i) => (
-        <mesh key={`tower_${i}`} geometry={geo} material={getMaterial('stone')} castShadow receiveShadow />
+        <mesh key={`tower_${i}`} geometry={geo} material={getMaterial('stone')} castShadow receiveShadow name={`tower_${i}`} />
       ))}
       
-      <mesh geometry={gate} material={getMaterial('wood')} castShadow receiveShadow />
+      <mesh geometry={gate} material={getMaterial('wood')} castShadow receiveShadow name="gate" />
       
       {moat && (
-        <mesh geometry={moat} material={getMaterial('water')} receiveShadow />
+        <mesh geometry={moat} material={getMaterial('water')} receiveShadow name="moat" />
       )}
       
       {buildings.map((geo, i) => (
-        <mesh key={`building_${i}`} geometry={geo} material={getMaterial('stone')} castShadow receiveShadow />
+        <mesh key={`building_${i}`} geometry={geo} material={getMaterial('stone')} castShadow receiveShadow name={`building_${i}`} />
       ))}
       
-      <mesh geometry={ground} material={getMaterial('ground')} receiveShadow rotation={[-Math.PI / 2, 0, 0]} />
+      <mesh geometry={ground} material={getMaterial('ground')} receiveShadow rotation={[-Math.PI / 2, 0, 0]} name="ground" />
     </group>
   );
 }

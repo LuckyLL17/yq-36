@@ -30,8 +30,10 @@ export type ViewMode = 'solid' | 'wireframe' | 'uv';
 export interface CastleState {
   params: CastleParams;
   viewMode: ViewMode;
+  castleGeometries: CastleMeshData | null;
   setParams: (params: Partial<CastleParams>) => void;
   setViewMode: (mode: ViewMode) => void;
+  setCastleGeometries: (geometries: CastleMeshData | null) => void;
   resetParams: () => void;
   randomizeSeed: () => void;
 }
