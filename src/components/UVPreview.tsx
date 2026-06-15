@@ -1,5 +1,6 @@
 import { useMemo, useRef, useEffect } from 'react';
 import { X, Maximize2 } from 'lucide-react';
+import * as THREE from 'three';
 import { useCastleStore } from '@/store/useCastleStore';
 import { CastleGenerator } from '@/utils/CastleGenerator';
 import { UVUnwrapper } from '@/utils/UVUnwrapper';
