@@ -1,0 +1,523 @@
+import * as THREE from 'three';
+import { CastleParams } from '@/types/castle';
+import { SeededRandom } from '@/utils/seededRandom';
+
+export class CastleGenerator {
+  private params: CastleParams;
+  private rng: SeededRandom;
+
+  constructor(params: CastleParams) {
+    this.params = params;
+    this.rng = new SeededRandom(params.seed);
+  }
+
+  generatePlotPoints(): THREE.Vector2[] {
+    const { plotWidth, plotDepth } = this.params;
+    const points: THREE.Vector2[] = [];
+    const corners = 4;
+    
+    for (let i = 0; i < corners; i++) {
+      const angle = (i / corners) * Math.PI * 2 - Math.PI / 2;
+      const wobble = 0.85 + this.rng.range(0, 0.3);
+      const x = Math.cos(angle) * (plotWidth / 2) * wobble;
+      const y = Math.sin(angle) * (plotDepth / 2) * wobble;
+      points.push(new THREE.Vector2(x, y));
+    }
+    
+    return points;
+  }
+
+  generateWalls(plotPoints: THREE.Vector2[]): THREE.BufferGeometry[] {
+    const walls: THREE.BufferGeometry[] = [];
+    const { wallHeight, wallThickness } = this.params;
+
+    for (let i = 0; i < plotPoints.length; i++) {
+      const p1 = plotPoints[i];
+      const p2 = plotPoints[(i + 1) % plotPoints.length];
+      
+      const wallGeo = this.createWallSegment(p1, p2, wallHeight, wallThickness);
+      walls.push(wallGeo);
+      
+      const crenellationGeo = this.createCrenellations(p1, p2, wallHeight, wallThickness);
+      walls.push(crenellationGeo);
+    }
+
+    return walls;
+  }
+
+  private createWallSegment(
+    p1: THREE.Vector2,
+    p2: THREE.Vector2,
+    height: number,
+    thickness: number
+  ): THREE.BufferGeometry {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx);
+
+    const geometry = new THREE.BoxGeometry(length, height, thickness);
+    geometry.translate(length / 2, height / 2, 0);
+    geometry.rotateY(-angle);
+    geometry.translate(p1.x, 0, p1.y);
+
+    this.applyUVsToBox(geometry, length, height, thickness);
+    
+    return geometry;
+  }
+
+  private createCrenellations(
+    p1: THREE.Vector2,
+    p2: THREE.Vector2,
+    wallHeight: number,
+    wallThickness: number
+  ): THREE.BufferGeometry {
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const angle = Math.atan2(dy, dx);
+    
+    const crenellationWidth = 1.2;
+    const crenellationHeight = 1.5;
+    const gap = 1.2;
+    const count = Math.floor(length / (crenellationWidth + gap));
+
+    const geometries: THREE.BufferGeometry[] = [];
+    
+    for (let i = 0; i < count; i++) {
+      const x = i * (crenellationWidth + gap) + gap / 2;
+      const geo = new THREE.BoxGeometry(crenellationWidth, crenellationHeight, wallThickness * 1.05);
+      geo.translate(x + crenellationWidth / 2, wallHeight + crenellationHeight / 2, 0);
+      geometries.push(geo);
+    }
+
+    const merged = this.mergeGeometries(geometries);
+    merged.rotateY(-angle);
+    merged.translate(p1.x, 0, p1.y);
+
+    return merged;
+  }
+
+  generateTowers(plotPoints: THREE.Vector2[]): THREE.BufferGeometry[] {
+    const towers: THREE.BufferGeometry[] = [];
+    const { towerCount, towerHeight, towerRadius } = this.params;
+
+    for (let i = 0; i < plotPoints.length; i++) {
+      const tower = this.createTower(plotPoints[i], towerHeight, towerRadius);
+      towers.push(tower);
+    }
+
+    const additionalTowers = Math.max(0, towerCount - plotPoints.length);
+    for (let i = 0; i < additionalTowers; i++) {
+      const segIndex = i % plotPoints.length;
+      const p1 = plotPoints[segIndex];
+      const p2 = plotPoints[(segIndex + 1) % plotPoints.length];
+      const t = 0.5;
+      const midPoint = new THREE.Vector2(
+        p1.x + (p2.x - p1.x) * t,
+        p1.y + (p2.y - p1.y) * t
+      );
+      const h = towerHeight * (0.8 + this.rng.range(0, 0.4));
+      const r = towerRadius * (0.8 + this.rng.range(0, 0.3));
+      const tower = this.createTower(midPoint, h, r);
+      towers.push(tower);
+    }
+
+    return towers;
+  }
+
+  private createTower(
+    position: THREE.Vector2,
+    height: number,
+    radius: number
+  ): THREE.BufferGeometry {
+    const geometries: THREE.BufferGeometry[] = [];
+
+    const bodyGeo = new THREE.CylinderGeometry(radius, radius * 1.1, height, 8);
+    bodyGeo.translate(0, height / 2, 0);
+    geometries.push(bodyGeo);
+
+    const roofHeight = radius * 1.2;
+    const roofGeo = new THREE.ConeGeometry(radius * 1.2, roofHeight, 8);
+    roofGeo.translate(0, height + roofHeight / 2, 0);
+    geometries.push(roofGeo);
+
+    const windowCount = 3;
+    for (let i = 0; i < windowCount; i++) {
+      const angle = (i / windowCount) * Math.PI * 2;
+      const windowGeo = new THREE.BoxGeometry(0.8, 1.5, 0.3);
+      windowGeo.translate(
+        Math.cos(angle) * (radius - 0.1),
+        height * 0.5 + i * 1.5 - 1.5,
+        Math.sin(angle) * (radius - 0.1)
+      );
+      windowGeo.rotateY(angle);
+      geometries.push(windowGeo);
+    }
+
+    const merged = this.mergeGeometries(geometries);
+    merged.translate(position.x, 0, position.y);
+
+    return merged;
+  }
+
+  generateGate(plotPoints: THREE.Vector2[]): THREE.BufferGeometry {
+    const { gateWidth, gateHeight, wallHeight, wallThickness } = this.params;
+    
+    const p1 = plotPoints[0];
+    const p2 = plotPoints[1];
+    const dx = p2.x - p1.x;
+    const dy = p2.y - p1.y;
+    const angle = Math.atan2(dy, dx);
+    
+    const midX = (p1.x + p2.x) / 2;
+    const midZ = (p1.y + p2.y) / 2;
+
+    const geometries: THREE.BufferGeometry[] = [];
+
+    const frameThickness = 1;
+    const leftFrame = new THREE.BoxGeometry(frameThickness, gateHeight + 1, wallThickness * 1.2);
+    leftFrame.translate(-gateWidth / 2 - frameThickness / 2, (gateHeight + 1) / 2, 0);
+    geometries.push(leftFrame);
+
+    const rightFrame = new THREE.BoxGeometry(frameThickness, gateHeight + 1, wallThickness * 1.2);
+    rightFrame.translate(gateWidth / 2 + frameThickness / 2, (gateHeight + 1) / 2, 0);
+    geometries.push(rightFrame);
+
+    const topFrame = new THREE.BoxGeometry(gateWidth + frameThickness * 2, frameThickness, wallThickness * 1.2);
+    topFrame.translate(0, gateHeight + 1 + frameThickness / 2, 0);
+    geometries.push(topFrame);
+
+    const doorLeft = new THREE.BoxGeometry(gateWidth / 2 - 0.1, gateHeight, 0.4);
+    doorLeft.translate(-gateWidth / 4, gateHeight / 2, 0);
+    geometries.push(doorLeft);
+
+    const doorRight = new THREE.BoxGeometry(gateWidth / 2 - 0.1, gateHeight, 0.4);
+    doorRight.translate(gateWidth / 4, gateHeight / 2, 0);
+    geometries.push(doorRight);
+
+    const merged = this.mergeGeometries(geometries);
+    merged.rotateY(-angle);
+    merged.translate(midX, 0, midZ);
+
+    return merged;
+  }
+
+  generateMoat(plotPoints: THREE.Vector2[]): THREE.BufferGeometry | null {
+    if (!this.params.hasMoat) return null;
+
+    const { moatWidth, moatDepth } = this.params;
+    
+    const outerPoints: THREE.Vector2[] = [];
+    const innerPoints: THREE.Vector2[] = [];
+
+    for (let i = 0; i < plotPoints.length; i++) {
+      const p1 = plotPoints[i];
+      const p2 = plotPoints[(i + 1) % plotPoints.length];
+      const p0 = plotPoints[(i - 1 + plotPoints.length) % plotPoints.length];
+      
+      const dx1 = p2.x - p1.x;
+      const dy1 = p2.y - p1.y;
+      const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1);
+      const nx1 = -dy1 / len1;
+      const ny1 = dx1 / len1;
+      
+      const dx2 = p1.x - p0.x;
+      const dy2 = p1.y - p0.y;
+      const len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2);
+      const nx2 = -dy2 / len2;
+      const ny2 = dx2 / len2;
+      
+      const nx = (nx1 + nx2) / 2;
+      const ny = (ny1 + ny2) / 2;
+      const nlen = Math.sqrt(nx * nx + ny * ny);
+      
+      outerPoints.push(new THREE.Vector2(
+        p1.x + (nx / nlen) * moatWidth,
+        p1.y + (ny / nlen) * moatWidth
+      ));
+      
+      innerPoints.push(new THREE.Vector2(
+        p1.x - (nx / nlen) * (this.params.wallThickness + 1),
+        p1.y - (ny / nlen) * (this.params.wallThickness + 1)
+      ));
+    }
+
+    const shape = new THREE.Shape();
+    shape.moveTo(outerPoints[0].x, outerPoints[0].y);
+    for (let i = 1; i < outerPoints.length; i++) {
+      shape.lineTo(outerPoints[i].x, outerPoints[i].y);
+    }
+    shape.closePath();
+
+    const hole = new THREE.Path();
+    hole.moveTo(innerPoints[0].x, innerPoints[0].y);
+    for (let i = 1; i < innerPoints.length; i++) {
+      hole.lineTo(innerPoints[i].x, innerPoints[i].y);
+    }
+    hole.closePath();
+    shape.holes.push(hole);
+
+    const extrudeSettings = {
+      depth: moatDepth,
+      bevelEnabled: false,
+    };
+
+    const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    geometry.rotateX(-Math.PI / 2);
+    geometry.translate(0, -moatDepth, 0);
+
+    return geometry;
+  }
+
+  generateBuildings(plotPoints: THREE.Vector2[]): THREE.BufferGeometry[] {
+    const buildings: THREE.BufferGeometry[] = [];
+    const { buildingCount, buildingHeight } = this.params;
+
+    const innerBounds = this.getInnerBounds(plotPoints);
+    const minX = innerBounds.minX + 3;
+    const maxX = innerBounds.maxX - 3;
+    const minZ = innerBounds.minY + 3;
+    const maxZ = innerBounds.maxY - 3;
+
+    const placed: { x: number; z: number; w: number; d: number }[] = [];
+
+    for (let i = 0; i < buildingCount; i++) {
+      let attempts = 0;
+      while (attempts < 20) {
+        const w = 3 + this.rng.range(0, 4);
+        const d = 3 + this.rng.range(0, 4);
+        const x = this.rng.range(minX + w / 2, maxX - w / 2);
+        const z = this.rng.range(minZ + d / 2, maxZ - d / 2);
+        const h = buildingHeight * (0.7 + this.rng.range(0, 0.6));
+
+        const overlap = placed.some((p) =>
+          Math.abs(p.x - x) < (p.w + w) / 2 + 1 &&
+          Math.abs(p.z - z) < (p.d + d) / 2 + 1
+        );
+
+        if (!overlap) {
+          const building = this.createBuilding(x, z, w, d, h);
+          buildings.push(building);
+          placed.push({ x, z, w, d });
+          break;
+        }
+        attempts++;
+      }
+    }
+
+    return buildings;
+  }
+
+  private createBuilding(
+    x: number,
+    z: number,
+    width: number,
+    depth: number,
+    height: number
+  ): THREE.BufferGeometry {
+    const geometries: THREE.BufferGeometry[] = [];
+
+    const bodyGeo = new THREE.BoxGeometry(width, height, depth);
+    bodyGeo.translate(0, height / 2, 0);
+    geometries.push(bodyGeo);
+
+    const roofHeight = depth * 0.4;
+    const roofGeo = new THREE.ConeGeometry(width * 0.7, roofHeight, 4);
+    roofGeo.rotateY(Math.PI / 4);
+    roofGeo.translate(0, height + roofHeight / 2, 0);
+    geometries.push(roofGeo);
+
+    const floors = Math.floor(height / 2.5);
+    for (let f = 0; f < floors; f++) {
+      const y = 1.5 + f * 2.5;
+      const winCount = Math.max(1, Math.floor(width / 2.5));
+      for (let w = 0; w < winCount; w++) {
+        const wx = -width / 2 + 1 + w * (width - 2) / Math.max(1, winCount - 1);
+        const windowGeo = new THREE.BoxGeometry(0.8, 1, 0.1);
+        windowGeo.translate(wx, y, depth / 2 + 0.05);
+        geometries.push(windowGeo);
+        
+        const windowBack = windowGeo.clone();
+        windowBack.translate(0, 0, -depth - 0.1);
+        geometries.push(windowBack);
+      }
+    }
+
+    const merged = this.mergeGeometries(geometries);
+    merged.translate(x, 0, z);
+
+    return merged;
+  }
+
+  generateGround(plotPoints: THREE.Vector2[]): THREE.BufferGeometry {
+    const { hasMoat, moatWidth } = this.params;
+    const padding = hasMoat ? moatWidth + 20 : 20;
+    
+    const size = Math.max(
+      this.params.plotWidth + padding * 2,
+      this.params.plotDepth + padding * 2
+    );
+
+    const geometry = new THREE.PlaneGeometry(size, size, 50, 50);
+    geometry.rotateX(-Math.PI / 2);
+    geometry.translate(0, -0.1, 0);
+
+    const positions = geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i);
+      const z = positions.getZ(i);
+      const noise = this.rng.range(-0.2, 0.2);
+      positions.setY(i, -0.1 + noise);
+    }
+    geometry.computeVertexNormals();
+
+    return geometry;
+  }
+
+  private getInnerBounds(points: THREE.Vector2[]): {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+  } {
+    let minX = Infinity,
+      maxX = -Infinity,
+      minY = Infinity,
+      maxY = -Infinity;
+    
+    for (const p of points) {
+      minX = Math.min(minX, p.x);
+      maxX = Math.max(maxX, p.x);
+      minY = Math.min(minY, p.y);
+      maxY = Math.max(maxY, p.y);
+    }
+    
+    return { minX, maxX, minY, maxY };
+  }
+
+  private mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry {
+    const mergedGeometry = new THREE.BufferGeometry();
+    
+    let vertexCount = 0;
+    let indexCount = 0;
+    
+    for (const geo of geometries) {
+      const pos = geo.attributes.position;
+      if (!pos) continue;
+      
+      if (geo.index) {
+        indexCount += geo.index.count;
+      } else {
+        indexCount += pos.count;
+      }
+      vertexCount += pos.count;
+    }
+    
+    const positions = new Float32Array(vertexCount * 3);
+    const normals = new Float32Array(vertexCount * 3);
+    const uvs = new Float32Array(vertexCount * 2);
+    const indices = new Uint32Array(indexCount);
+    
+    let vertexOffset = 0;
+    let indexOffset = 0;
+    
+    for (const geo of geometries) {
+      const pos = geo.attributes.position;
+      const nor = geo.attributes.normal;
+      const uv = geo.attributes.uv;
+      
+      if (!pos) continue;
+      
+      for (let i = 0; i < pos.count; i++) {
+        positions[(vertexOffset + i) * 3] = pos.getX(i);
+        positions[(vertexOffset + i) * 3 + 1] = pos.getY(i);
+        positions[(vertexOffset + i) * 3 + 2] = pos.getZ(i);
+        
+        if (nor) {
+          normals[(vertexOffset + i) * 3] = nor.getX(i);
+          normals[(vertexOffset + i) * 3 + 1] = nor.getY(i);
+          normals[(vertexOffset + i) * 3 + 2] = nor.getZ(i);
+        }
+        
+        if (uv) {
+          uvs[(vertexOffset + i) * 2] = uv.getX(i);
+          uvs[(vertexOffset + i) * 2 + 1] = uv.getY(i);
+        }
+      }
+      
+      if (geo.index) {
+        const idx = geo.index;
+        for (let i = 0; i < idx.count; i++) {
+          indices[indexOffset + i] = idx.getX(i) + vertexOffset;
+        }
+        indexOffset += idx.count;
+      } else {
+        for (let i = 0; i < pos.count; i++) {
+          indices[indexOffset + i] = i + vertexOffset;
+        }
+        indexOffset += pos.count;
+      }
+      
+      vertexOffset += pos.count;
+    }
+    
+    mergedGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    mergedGeometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+    mergedGeometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    mergedGeometry.setIndex(new THREE.BufferAttribute(indices, 1));
+    
+    return mergedGeometry;
+  }
+
+  private applyUVsToBox(
+    geometry: THREE.BufferGeometry,
+    width: number,
+    height: number,
+    depth: number
+  ) {
+    const uvs = geometry.attributes.uv;
+    if (!uvs) return;
+
+    const positions = geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i);
+      const y = positions.getY(i);
+      const z = positions.getZ(i);
+
+      if (Math.abs(z - depth / 2) < 0.01) {
+        uvs.setXY(i, x / width + 0.5, y / height);
+      } else if (Math.abs(z + depth / 2) < 0.01) {
+        uvs.setXY(i, 1 - (x / width + 0.5), y / height);
+      } else if (Math.abs(x - width / 2) < 0.01) {
+        uvs.setXY(i, z / depth + 0.5, y / height);
+      } else if (Math.abs(x + width / 2) < 0.01) {
+        uvs.setXY(i, 1 - (z / depth + 0.5), y / height);
+      } else {
+        uvs.setXY(i, x / width + 0.5, z / depth + 0.5);
+      }
+    }
+    uvs.needsUpdate = true;
+  }
+
+  generateAll(): {
+    plotPoints: THREE.Vector2[];
+    walls: THREE.BufferGeometry[];
+    towers: THREE.BufferGeometry[];
+    gate: THREE.BufferGeometry;
+    moat: THREE.BufferGeometry | null;
+    buildings: THREE.BufferGeometry[];
+    ground: THREE.BufferGeometry;
+  } {
+    const plotPoints = this.generatePlotPoints();
+    return {
+      plotPoints,
+      walls: this.generateWalls(plotPoints),
+      towers: this.generateTowers(plotPoints),
+      gate: this.generateGate(plotPoints),
+      moat: this.generateMoat(plotPoints),
+      buildings: this.generateBuildings(plotPoints),
+      ground: this.generateGround(plotPoints),
+    };
+  }
+}
