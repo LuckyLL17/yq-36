@@ -81,12 +81,17 @@ export class UVUnwrapper {
       return areaB - areaA;
     });
 
-    let maxDim = 0;
-    for (const island of islands) {
-      maxDim = Math.max(maxDim, island.bounds.maxU - island.bounds.minU);
-      maxDim = Math.max(maxDim, island.bounds.maxV - island.bounds.minV);
+    let totalArea = 0;
+    let maxSize = 0;
+    for (const island of sorted) {
+      const w = island.bounds.maxU - island.bounds.minU;
+      const h = island.bounds.maxV - island.bounds.minV;
+      totalArea += w * h;
+      maxSize = Math.max(maxSize, w, h);
     }
-    const gap = maxDim * padding;
+
+    const gap = maxSize * padding;
+    const targetWidth = Math.sqrt(totalArea) * (1 + padding * 2);
 
     const placed: {
       island: UVIsland;
@@ -102,7 +107,7 @@ export class UVUnwrapper {
     for (const island of sorted) {
       const origW = island.bounds.maxU - island.bounds.minU;
       const origH = island.bounds.maxV - island.bounds.minV;
-      
+
       const wNormal = origW + gap;
       const hNormal = origH + gap;
       const wRotated = origH + gap;
@@ -117,8 +122,8 @@ export class UVUnwrapper {
 
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        
-        if (hNormal <= row.height * 1.2) {
+
+        if (row.width + wNormal <= targetWidth && hNormal <= row.height * 1.15) {
           const waste = row.height - hNormal;
           if (waste < bestWaste) {
             bestWaste = waste;
@@ -129,8 +134,8 @@ export class UVUnwrapper {
             bestRotated = false;
           }
         }
-        
-        if (hRotated <= row.height * 1.2) {
+
+        if (row.width + wRotated <= targetWidth && hRotated <= row.height * 1.15) {
           const waste = row.height - hRotated;
           if (waste < bestWaste) {
             bestWaste = waste;
@@ -154,13 +159,24 @@ export class UVUnwrapper {
         });
         rows[bestRow].width += bestW;
       } else {
-        const aspectRatio = origW / origH;
-        const useRotation = aspectRatio < 0.5;
+        const aspectNormal = origW / origH;
+        const aspectRotated = origH / origW;
+        
+        const fitsNormal = wNormal <= targetWidth;
+        const fitsRotated = wRotated <= targetWidth;
+        
+        let useRotation = false;
+        if (fitsNormal && fitsRotated) {
+          useRotation = aspectRotated > aspectNormal;
+        } else if (fitsRotated && !fitsNormal) {
+          useRotation = true;
+        }
+
         const finalW = useRotation ? wRotated : wNormal;
         const finalH = useRotation ? hRotated : hNormal;
-        
-        const newRowY = rows.length > 0 
-          ? rows[rows.length - 1].y + rows[rows.length - 1].height 
+
+        const newRowY = rows.length > 0
+          ? rows[rows.length - 1].y + rows[rows.length - 1].height
           : gap;
         rows.push({
           y: newRowY,
@@ -182,15 +198,15 @@ export class UVUnwrapper {
     for (const row of rows) {
       totalWidth = Math.max(totalWidth, row.width);
     }
-    const totalHeight = rows.length > 0 
-      ? rows[rows.length - 1].y + rows[rows.length - 1].height + gap 
+    const totalHeight = rows.length > 0
+      ? rows[rows.length - 1].y + rows[rows.length - 1].height + gap
       : 1;
 
-    const maxTotal = Math.max(totalWidth, totalHeight);
-    const scale = 1 / maxTotal;
-    const margin = gap * scale;
-    
-    const finalScale = scale * (1 - margin * 2);
+    const maxDim = Math.max(totalWidth, totalHeight);
+    const scale = 1 / maxDim;
+    const padScale = padding;
+
+    const finalScale = scale * (1 - padScale * 2);
     const offsetX = (1 - totalWidth * finalScale) / 2;
     const offsetY = (1 - totalHeight * finalScale) / 2;
 
