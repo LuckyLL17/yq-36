@@ -39,7 +39,7 @@ export function Castle({ params, viewMode }: CastleProps) {
       islands.push(island);
     });
     
-    UVUnwrapper.packIslands(islands, 0.03);
+    UVUnwrapper.packIslands(islands, 0.02);
     
     return { ...result, uvIslands: islands };
   }, [params]);
@@ -102,7 +102,7 @@ export function Castle({ params, viewMode }: CastleProps) {
         <mesh key={`building_${i}`} geometry={geo} material={getMaterial('stone')} castShadow receiveShadow name={`building_${i}`} />
       ))}
       
-      <mesh geometry={ground} material={getMaterial('ground')} receiveShadow rotation={[-Math.PI / 2, 0, 0]} name="ground" />
+      <mesh geometry={ground} material={getMaterial('ground')} receiveShadow name="ground" />
     </group>
   );
 }

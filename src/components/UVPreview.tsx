@@ -42,7 +42,7 @@ export function UVPreview({ onClose }: UVPreviewProps) {
       geos.push(geo);
     });
     
-    UVUnwrapper.packIslands(islands, 0.03);
+    UVUnwrapper.packIslands(islands, 0.02);
     
     return { allGeometries: geos, uvIslands: islands };
   }, [params]);

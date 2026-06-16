@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { X, Download, FileType, FileCode, CheckCircle, AlertCircle } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { ModelExporter } from '@/utils/ModelExporter';
@@ -19,6 +19,42 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
   const [isExporting, setIsExporting] = useState(false);
   const [exportStatus, setExportStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+
+  const { uvPreviewUrl, islandCount } = useMemo(() => {
+    if (!open) return { uvPreviewUrl: '', islandCount: 0 };
+    
+    const generator = new CastleGenerator(params);
+    const result = generator.generateAll();
+
+    const islands: UVIsland[] = [];
+
+    result.walls.forEach((geo, i) => {
+      const island = UVUnwrapper.unwrapGeometry(geo, `wall_${i}`);
+      islands.push(island);
+    });
+    result.towers.forEach((geo, i) => {
+      const island = UVUnwrapper.unwrapGeometry(geo, `tower_${i}`);
+      islands.push(island);
+    });
+    islands.push(UVUnwrapper.unwrapGeometry(result.gate, 'gate'));
+    if (result.moat) {
+      islands.push(UVUnwrapper.unwrapGeometry(result.moat, 'moat'));
+    }
+    result.buildings.forEach((geo, i) => {
+      const island = UVUnwrapper.unwrapGeometry(geo, `building_${i}`);
+      islands.push(island);
+    });
+
+    UVUnwrapper.packIslands(islands, 0.02);
+
+    const geometries = islands.map((island) => island.geometry);
+    const canvas = UVUnwrapper.generateUVPreview(geometries, 256);
+    
+    return {
+      uvPreviewUrl: canvas.toDataURL(),
+      islandCount: islands.length,
+    };
+  }, [params, open]);
 
   const buildExportGroup = (): THREE.Group => {
     const group = new THREE.Group();
@@ -46,7 +82,7 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
       islands.push(island);
     });
 
-    UVUnwrapper.packIslands(islands, 0.03);
+    UVUnwrapper.packIslands(islands, 0.02);
 
     const stoneMaterial = new THREE.MeshStandardMaterial({
       color: 0x8b7355,
@@ -104,7 +140,6 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
 
     const groundMesh = new THREE.Mesh(result.ground, groundMaterial);
     groundMesh.name = 'ground';
-    groundMesh.rotation.x = -Math.PI / 2;
     group.add(groundMesh);
 
     return group;
@@ -220,9 +255,18 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
               <span className="text-stone-400">建筑数量</span>
               <span className="text-stone-200">{params.buildingCount}</span>
             </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-stone-400">UV布局</span>
-              <span className="text-green-400">自动打包</span>
+            <div className="pt-2 mt-2 border-t border-stone-700/50">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-stone-400">UV布局</span>
+                <span className="text-green-400">{islandCount} 个UV岛</span>
+              </div>
+              <div className="bg-stone-900 rounded-lg overflow-hidden border border-stone-700">
+                <img 
+                  src={uvPreviewUrl} 
+                  alt="UV预览" 
+                  className="w-full aspect-square object-contain"
+                />
+              </div>
             </div>
           </div>
 
