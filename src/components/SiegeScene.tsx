@@ -5,13 +5,14 @@ import { useSiegeStore } from '@/store/useSiegeStore';
 import { useCastleStore } from '@/store/useCastleStore';
 import { CastleGenerator } from '@/utils/CastleGenerator';
 import { WEAPON_CONFIGS } from '@/types/siege';
+import { ViewMode } from '@/types/castle';
 import { SiegeWeapons } from './SiegeWeapons';
 import { AttackEffects } from './AttackEffects';
 import { DefenseAnalysis } from './DefenseAnalysis';
 
 function GroundClickHandler() {
   const { raycaster, camera, gl } = useThree();
-  const { placementMode, selectedWeaponType, addWeapon, setPlacementMode } = useSiegeStore();
+  const { placementMode, selectedWeaponType, addWeapon } = useSiegeStore();
   const { params } = useCastleStore();
 
   const handleClick = useCallback(
@@ -45,9 +46,8 @@ function GroundClickHandler() {
         position: [intersection.x, 0, intersection.z],
         rotation,
       });
-      setPlacementMode(false);
     },
-    [placementMode, selectedWeaponType, addWeapon, setPlacementMode, raycaster, camera, gl, params],
+    [placementMode, selectedWeaponType, addWeapon, raycaster, camera, gl, params],
   );
 
   useEffect(() => {
@@ -217,7 +217,7 @@ function CursorStyleUpdater() {
   return null;
 }
 
-export function SiegeScene() {
+export function SiegeScene({ viewMode }: { viewMode: ViewMode }) {
   const siegeMode = useSiegeStore((s) => s.siegeMode);
 
   if (!siegeMode) return null;
@@ -229,9 +229,9 @@ export function SiegeScene() {
       <WallSegmentGenerator />
       <ProjectileUpdater />
       <CursorStyleUpdater />
-      <SiegeWeapons />
-      <AttackEffects />
-      <DefenseAnalysis />
+      <SiegeWeapons viewMode={viewMode} />
+      <AttackEffects viewMode={viewMode} />
+      <DefenseAnalysis viewMode={viewMode} />
     </>
   );
 }

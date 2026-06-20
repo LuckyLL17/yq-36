@@ -2,8 +2,10 @@ import { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { useSiegeStore } from '@/store/useSiegeStore';
 import { Projectile, ImpactEffect } from '@/types/siege';
+import { ViewMode } from '@/types/castle';
+import { MaterialFactory } from '@/utils/MaterialFactory';
 
-function ProjectileMesh({ projectile }: { projectile: Projectile }) {
+function ProjectileMesh({ projectile, viewMode }: { projectile: Projectile; viewMode: ViewMode }) {
   const meshRef = useRef<THREE.Mesh>(null);
 
   const trajectory = useMemo(() => {
@@ -56,11 +58,15 @@ function ProjectileMesh({ projectile }: { projectile: Projectile }) {
     }
   }, [projectile.type]);
 
+  const isWireframe = viewMode === 'wireframe';
+  const wireframeMaterial = useMemo(() => MaterialFactory.getWireframeMaterial(), []);
+  const material = isWireframe ? wireframeMaterial : null;
+
   return (
     <group>
-      <mesh ref={meshRef} position={position.toArray() as [number, number, number]} castShadow>
+      <mesh ref={meshRef} position={position.toArray() as [number, number, number]} castShadow material={material}>
         <sphereGeometry args={[projectileSize, 8, 6]} />
-        <meshStandardMaterial color={projectileColor} roughness={0.6} />
+        {!isWireframe && <meshStandardMaterial color={projectileColor} roughness={0.6} />}
       </mesh>
       <line>
         <bufferGeometry>
@@ -77,7 +83,7 @@ function ProjectileMesh({ projectile }: { projectile: Projectile }) {
   );
 }
 
-function ImpactMesh({ impact }: { impact: ImpactEffect }) {
+function ImpactMesh({ impact, viewMode }: { impact: ImpactEffect; viewMode: ViewMode }) {
   const groupRef = useRef<THREE.Group>(null);
   const particleCount = 12;
   const scale = Math.sqrt(impact.damage) * 0.5;
@@ -94,17 +100,23 @@ function ImpactMesh({ impact }: { impact: ImpactEffect }) {
     }));
   }, []);
 
+  const isWireframe = viewMode === 'wireframe';
+  const wireframeMaterial = useMemo(() => MaterialFactory.getWireframeMaterial(), []);
+  const particleMaterial = isWireframe ? wireframeMaterial : null;
+
   return (
     <group ref={groupRef} position={impact.position as [number, number, number]}>
-      <pointLight
-        position={[0, 1, 0]}
-        intensity={5 * (1 - impact.progress)}
-        distance={10}
-        color="#ff4400"
-      />
-      <mesh position={[0, 0.5, 0]} scale={[1, 1, 1].map((s) => s * scale * impact.progress) as [number, number, number]}>
+      {!isWireframe && (
+        <pointLight
+          position={[0, 1, 0]}
+          intensity={5 * (1 - impact.progress)}
+          distance={10}
+          color="#ff4400"
+        />
+      )}
+      <mesh position={[0, 0.5, 0]} scale={[1, 1, 1].map((s) => s * scale * impact.progress) as [number, number, number]} material={particleMaterial}>
         <sphereGeometry args={[1, 8, 6]} />
-        <meshBasicMaterial color="#ff6600" transparent opacity={0.6 * (1 - impact.progress)} />
+        {!isWireframe && <meshBasicMaterial color="#ff6600" transparent opacity={0.6 * (1 - impact.progress)} />}
       </mesh>
       {particleOffsets.map((p, i) => {
         const pos: [number, number, number] = [
@@ -113,13 +125,15 @@ function ImpactMesh({ impact }: { impact: ImpactEffect }) {
           impact.position[2] + p.dir.z * p.speed * impact.progress,
         ];
         return (
-          <mesh key={i} position={pos}>
+          <mesh key={i} position={pos} material={particleMaterial}>
             <boxGeometry args={[p.size, p.size, p.size]} />
-            <meshBasicMaterial
-              color={i % 2 === 0 ? '#8b7355' : '#555555'}
-              transparent
-              opacity={1 - impact.progress}
-            />
+            {!isWireframe && (
+              <meshBasicMaterial
+                color={i % 2 === 0 ? '#8b7355' : '#555555'}
+                transparent
+                opacity={1 - impact.progress}
+              />
+            )}
           </mesh>
         );
       })}
@@ -127,8 +141,10 @@ function ImpactMesh({ impact }: { impact: ImpactEffect }) {
   );
 }
 
-function WallDamageOverlay() {
+function WallDamageOverlay({ viewMode }: { viewMode: ViewMode }) {
   const wallSegments = useSiegeStore((s) => s.wallSegments);
+  const isWireframe = viewMode === 'wireframe';
+  const wireframeMaterial = useMemo(() => MaterialFactory.getWireframeMaterial(), []);
 
   return (
     <group>
@@ -140,9 +156,9 @@ function WallDamageOverlay() {
           const color = damageRatio > 0.7 ? '#ff0000' : damageRatio > 0.4 ? '#ff6600' : '#ffaa00';
 
           return (
-            <mesh key={seg.id} position={seg.centerPosition as [number, number, number]}>
+            <mesh key={seg.id} position={seg.centerPosition as [number, number, number]} material={isWireframe ? wireframeMaterial : null}>
               <boxGeometry args={[4, seg.height, seg.thickness + 0.3]} />
-              <meshBasicMaterial color={color} transparent opacity={opacity} />
+              {!isWireframe && <meshBasicMaterial color={color} transparent opacity={opacity} />}
             </mesh>
           );
         })}
@@ -150,19 +166,19 @@ function WallDamageOverlay() {
   );
 }
 
-export function AttackEffects() {
+export function AttackEffects({ viewMode }: { viewMode: ViewMode }) {
   const projectiles = useSiegeStore((s) => s.projectiles);
   const impacts = useSiegeStore((s) => s.impacts);
 
   return (
     <group>
       {projectiles.map((proj) => (
-        <ProjectileMesh key={proj.id} projectile={proj} />
+        <ProjectileMesh key={proj.id} projectile={proj} viewMode={viewMode} />
       ))}
       {impacts.map((impact) => (
-        <ImpactMesh key={impact.id} impact={impact} />
+        <ImpactMesh key={impact.id} impact={impact} viewMode={viewMode} />
       ))}
-      <WallDamageOverlay />
+      <WallDamageOverlay viewMode={viewMode} />
     </group>
   );
 }

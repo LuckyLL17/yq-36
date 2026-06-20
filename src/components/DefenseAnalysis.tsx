@@ -1,11 +1,16 @@
-import { useRef } from 'react';
+import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useSiegeStore } from '@/store/useSiegeStore';
 import { WEAPON_CONFIGS } from '@/types/siege';
+import { ViewMode } from '@/types/castle';
+import { MaterialFactory } from '@/utils/MaterialFactory';
 
-function WeakPointMarker() {
+function WeakPointMarker({ viewMode }: { viewMode: ViewMode }) {
   const weakPoints = useSiegeStore((s) => s.weakPoints);
+  const isWireframe = viewMode === 'wireframe';
+  const wireframeMaterial = useMemo(() => MaterialFactory.getWireframeMaterial(), []);
+  const material = isWireframe ? wireframeMaterial : null;
 
   return (
     <group>
@@ -15,12 +20,12 @@ function WeakPointMarker() {
 
         return (
           <group key={`wp_${i}`} position={wp.position as [number, number, number]}>
-            <mesh>
+            <mesh material={material}>
               <sphereGeometry args={[0.8, 12, 8]} />
-              <meshBasicMaterial color={color} transparent opacity={0.5 * intensity} />
+              {!isWireframe && <meshBasicMaterial color={color} transparent opacity={0.5 * intensity} />}
             </mesh>
             <PulsingRing color={color} intensity={intensity} />
-            <pointLight intensity={2 * intensity} distance={8} color={color} />
+            {!isWireframe && <pointLight intensity={2 * intensity} distance={8} color={color} />}
           </group>
         );
       })}
@@ -46,8 +51,11 @@ function PulsingRing({ color, intensity }: { color: string; intensity: number })
   );
 }
 
-function DefensePositionMarker() {
+function DefensePositionMarker({ viewMode }: { viewMode: ViewMode }) {
   const defensePositions = useSiegeStore((s) => s.defensePositions);
+  const isWireframe = viewMode === 'wireframe';
+  const wireframeMaterial = useMemo(() => MaterialFactory.getWireframeMaterial(), []);
+  const material = isWireframe ? wireframeMaterial : null;
 
   return (
     <group>
@@ -56,19 +64,19 @@ function DefensePositionMarker() {
 
         return (
           <group key={`dp_${i}`} position={dp.position as [number, number, number]}>
-            <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} material={material}>
               <circleGeometry args={[1.2, 6]} />
-              <meshBasicMaterial color="#00cc66" transparent opacity={0.4 * coverage} />
+              {!isWireframe && <meshBasicMaterial color="#00cc66" transparent opacity={0.4 * coverage} />}
             </mesh>
-            <mesh>
+            <mesh material={material}>
               <coneGeometry args={[0.3, 1.2, 6]} />
-              <meshBasicMaterial color="#00ff88" transparent opacity={0.7} />
+              {!isWireframe && <meshBasicMaterial color="#00ff88" transparent opacity={0.7} />}
             </mesh>
-            <mesh position={[0, 1.4, 0]}>
+            <mesh position={[0, 1.4, 0]} material={material}>
               <sphereGeometry args={[0.2, 8, 6]} />
-              <meshBasicMaterial color="#00ff88" transparent opacity={0.8} />
+              {!isWireframe && <meshBasicMaterial color="#00ff88" transparent opacity={0.8} />}
             </mesh>
-            <pointLight intensity={1.5 * coverage} distance={6} color="#00ff88" />
+            {!isWireframe && <pointLight intensity={1.5 * coverage} distance={6} color="#00ff88" />}
           </group>
         );
       })}
@@ -121,15 +129,15 @@ function WeaponRangeOverlay() {
   );
 }
 
-export function DefenseAnalysis() {
+export function DefenseAnalysis({ viewMode }: { viewMode: ViewMode }) {
   const showAnalysis = useSiegeStore((s) => s.showAnalysis);
 
   if (!showAnalysis) return null;
 
   return (
     <group>
-      <WeakPointMarker />
-      <DefensePositionMarker />
+      <WeakPointMarker viewMode={viewMode} />
+      <DefensePositionMarker viewMode={viewMode} />
       <WeaponRangeOverlay />
     </group>
   );

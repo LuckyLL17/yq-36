@@ -58,7 +58,7 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
   return (
     <>
       <Castle params={params} viewMode={viewMode} />
-      <SiegeScene />
+      <SiegeScene viewMode={viewMode} />
       <Grid
         position={[0, -0.09, 0]}
         args={[200, 200]}
