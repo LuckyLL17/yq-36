@@ -1,7 +1,7 @@
 import { useMemo, useRef, useEffect } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { CastleParams } from '@/types/castle';
+import { CastleParams, ViewMode } from '@/types/castle';
 import { CastleGenerator } from '@/utils/CastleGenerator';
 import { MaterialFactory } from '@/utils/MaterialFactory';
 import { UVUnwrapper, UVIsland } from '@/utils/UVUnwrapper';
@@ -10,7 +10,7 @@ import { getInterpolatedStyle } from '@/data/historicalEras';
 
 interface CastleProps {
   params: CastleParams;
-  viewMode: 'solid' | 'wireframe' | 'uv';
+  viewMode: ViewMode;
 }
 
 export function Castle({ params, viewMode }: CastleProps) {

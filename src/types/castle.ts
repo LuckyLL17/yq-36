@@ -31,13 +31,49 @@ export interface CastleMeshData {
   ground: THREE.BufferGeometry;
 }
 
-export type ViewMode = 'solid' | 'wireframe' | 'uv';
+export type ViewMode = 'solid' | 'wireframe' | 'uv' | 'interior';
+
+export type RoomType = 'hall' | 'bedroom' | 'kitchen' | 'armory' | 'church' | 'dungeon' | 'library' | 'garden';
+
+export interface Room {
+  id: string;
+  type: RoomType;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  name?: string;
+}
+
+export interface Corridor {
+  id: string;
+  fromRoomId: string;
+  toRoomId: string;
+  path: { x: number; y: number }[];
+}
+
+export interface InteriorLayout {
+  rooms: Room[];
+  corridors: Corridor[];
+  selectedRoomId: string | null;
+}
+
+export interface RoomTemplate {
+  type: RoomType;
+  name: string;
+  icon: string;
+  defaultWidth: number;
+  defaultHeight: number;
+  color: string;
+}
 
 export interface CastleState {
   params: CastleParams;
   viewMode: ViewMode;
   castleGeometries: CastleMeshData | null;
   selectedEraId: string | null;
+  interiorLayout: InteriorLayout;
   setParams: (params: Partial<CastleParams>) => void;
   setViewMode: (mode: ViewMode) => void;
   setCastleGeometries: (geometries: CastleMeshData | null) => void;
@@ -45,4 +81,10 @@ export interface CastleState {
   applyEraStyle: (year: number) => void;
   resetParams: () => void;
   randomizeSeed: () => void;
+  addRoom: (room: Room) => void;
+  updateRoom: (id: string, updates: Partial<Room>) => void;
+  deleteRoom: (id: string) => void;
+  selectRoom: (id: string | null) => void;
+  moveRoom: (id: string, x: number, y: number) => void;
+  clearAllRooms: () => void;
 }

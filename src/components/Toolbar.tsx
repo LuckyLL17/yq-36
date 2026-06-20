@@ -1,4 +1,4 @@
-import { Download, Grid3X3, Box, Shuffle, RotateCcw, Eye, Swords } from 'lucide-react';
+import { Download, Grid3X3, Box, Shuffle, RotateCcw, Eye, Swords, LayoutGrid } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { ViewMode } from '@/types/castle';
 import { cn } from '@/lib/utils';
@@ -18,6 +18,7 @@ export function Toolbar({ viewMode, onViewModeChange, onExport, siegeMode, onTog
     { mode: 'solid', label: '实体', icon: <Box className="w-4 h-4" /> },
     { mode: 'wireframe', label: '线框', icon: <Grid3X3 className="w-4 h-4" /> },
     { mode: 'uv', label: 'UV', icon: <Eye className="w-4 h-4" /> },
+    { mode: 'interior', label: '内部布局', icon: <LayoutGrid className="w-4 h-4" /> },
   ];
 
   return (
