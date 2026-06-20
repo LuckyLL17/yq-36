@@ -4,15 +4,13 @@ import { ViewMode } from '@/types/castle';
 import { cn } from '@/lib/utils';
 
 interface ToolbarProps {
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
   onExport: () => void;
   siegeMode: boolean;
   onToggleSiegeMode: () => void;
 }
 
-export function Toolbar({ viewMode, onViewModeChange, onExport, siegeMode, onToggleSiegeMode }: ToolbarProps) {
-  const { resetParams, randomizeSeed } = useCastleStore();
+export function Toolbar({ onExport, siegeMode, onToggleSiegeMode }: ToolbarProps) {
+  const { viewMode, setViewMode, resetParams, randomizeSeed } = useCastleStore();
 
   const viewModes: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
     { mode: 'solid', label: '实体', icon: <Box className="w-4 h-4" /> },
@@ -43,7 +41,7 @@ export function Toolbar({ viewMode, onViewModeChange, onExport, siegeMode, onTog
         {viewModes.map(({ mode, label, icon }) => (
           <button
             key={mode}
-            onClick={() => onViewModeChange(mode)}
+            onClick={() => setViewMode(mode)}
             className={cn(
               'flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all',
               viewMode === mode

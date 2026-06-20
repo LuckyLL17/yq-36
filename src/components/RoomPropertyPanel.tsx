@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { ROOM_TEMPLATES } from '@/data/roomTemplates';
 import { Settings, Trash2, RotateCw, Maximize2 } from 'lucide-react';
@@ -5,6 +6,12 @@ import { Settings, Trash2, RotateCw, Maximize2 } from 'lucide-react';
 export function RoomPropertyPanel() {
   const { interiorLayout, updateRoom, deleteRoom } = useCastleStore();
   const selectedRoom = interiorLayout.rooms.find((r) => r.id === interiorLayout.selectedRoomId);
+  const [toast, setToast] = useState<{ type: 'error'; message: string } | null>(null);
+
+  const showError = (message: string) => {
+    setToast({ type: 'error', message });
+    setTimeout(() => setToast(null), 2000);
+  };
 
   if (!selectedRoom) {
     return (
@@ -33,15 +40,18 @@ export function RoomPropertyPanel() {
   const template = ROOM_TEMPLATES[selectedRoom.type];
 
   const handleWidthChange = (value: number) => {
-    updateRoom(selectedRoom.id, { width: Math.max(2, value) });
+    const success = updateRoom(selectedRoom.id, { width: Math.max(2, value) });
+    if (!success) showError('宽度调整失败：与其他房间重叠');
   };
 
   const handleHeightChange = (value: number) => {
-    updateRoom(selectedRoom.id, { height: Math.max(2, value) });
+    const success = updateRoom(selectedRoom.id, { height: Math.max(2, value) });
+    if (!success) showError('高度调整失败：与其他房间重叠');
   };
 
   const handleRotationChange = (value: number) => {
-    updateRoom(selectedRoom.id, { rotation: value });
+    const success = updateRoom(selectedRoom.id, { rotation: value });
+    if (!success) showError('旋转失败：与其他房间重叠');
   };
 
   const handleNameChange = (value: string) => {
@@ -49,7 +59,13 @@ export function RoomPropertyPanel() {
   };
 
   return (
-    <div className="w-64 bg-stone-900/95 backdrop-blur-sm border-l border-amber-900/30 flex flex-col h-full">
+    <div className="w-64 bg-stone-900/95 backdrop-blur-sm border-l border-amber-900/30 flex flex-col h-full relative">
+      {toast && (
+        <div className="absolute top-2 left-2 right-2 z-20 px-3 py-2 rounded bg-red-900/95 text-red-200 border border-red-700/50 text-xs font-medium shadow-lg">
+          ⚠️ {toast.message}
+        </div>
+      )}
+
       <div className="p-4 border-b border-amber-900/30 bg-gradient-to-l from-stone-900 to-stone-800">
         <div className="flex items-center gap-3">
           <div

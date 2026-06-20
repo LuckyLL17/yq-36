@@ -81,10 +81,10 @@ export interface CastleState {
   applyEraStyle: (year: number) => void;
   resetParams: () => void;
   randomizeSeed: () => void;
-  addRoom: (room: Room) => void;
-  updateRoom: (id: string, updates: Partial<Room>) => void;
+  addRoom: (room: Room) => boolean;
+  updateRoom: (id: string, updates: Partial<Room>) => boolean;
   deleteRoom: (id: string) => void;
   selectRoom: (id: string | null) => void;
-  moveRoom: (id: string, x: number, y: number) => void;
+  moveRoom: (id: string, x: number, y: number) => boolean;
   clearAllRooms: () => void;
 }

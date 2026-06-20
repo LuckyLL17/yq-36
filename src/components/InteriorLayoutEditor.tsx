@@ -7,6 +7,15 @@ function generateId(): string {
   return Math.random().toString(36).substring(2, 9);
 }
 
+function roomsOverlap(a: Room, b: Room): boolean {
+  return !(
+    a.x + a.width <= b.x ||
+    b.x + b.width <= a.x ||
+    a.y + a.height <= b.y ||
+    b.y + b.height <= a.y
+  );
+}
+
 export function InteriorLayoutEditor() {
   const { params, interiorLayout, addRoom, selectRoom, moveRoom } = useCastleStore();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -14,6 +23,8 @@ export function InteriorLayoutEditor() {
   const [draggingRoomId, setDraggingRoomId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragOver, setIsDragOver] = useState(false);
+  const [previewRoom, setPreviewRoom] = useState<Room | null>(null);
+  const [showToast, setShowToast] = useState<{ type: 'error' | 'success'; message: string } | null>(null);
 
   const padding = 30;
   const scale = 10;
@@ -29,6 +40,29 @@ export function InteriorLayoutEditor() {
   const castleInnerY = padding + wallThickness * scale;
   const castleInnerWidth = (plotWidth - wallThickness * 2) * scale;
   const castleInnerHeight = (plotDepth - wallThickness * 2) * scale;
+
+  const innerWidth = plotWidth - wallThickness * 2;
+  const innerHeight = plotDepth - wallThickness * 2;
+
+  const clampRoom = useCallback((room: Room): Room => {
+    return {
+      ...room,
+      x: Math.max(0, Math.min(innerWidth - room.width, room.x)),
+      y: Math.max(0, Math.min(innerHeight - room.height, room.y)),
+    };
+  }, [innerWidth, innerHeight]);
+
+  const hasOverlap = useCallback((room: Room, excludeId?: string): boolean => {
+    return interiorLayout.rooms.some(r => {
+      if (excludeId && r.id === excludeId) return false;
+      return roomsOverlap(room, r);
+    });
+  }, [interiorLayout.rooms]);
+
+  const showNotification = (type: 'error' | 'success', message: string) => {
+    setShowToast({ type, message });
+    setTimeout(() => setShowToast(null), 2000);
+  };
 
   const screenToWorld = useCallback(
     (clientX: number, clientY: number) => {
@@ -47,6 +81,25 @@ export function InteriorLayoutEditor() {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'copy';
     if (!isDragOver) setIsDragOver(true);
+
+    const roomType = e.dataTransfer.types.includes('roomtype') ? (e.dataTransfer.getData('roomType') as RoomType) : null;
+    if (!roomType || !ROOM_TEMPLATES[roomType]) return;
+
+    const template = ROOM_TEMPLATES[roomType];
+    const { x, y } = screenToWorld(e.clientX, e.clientY);
+
+    const preview: Room = clampRoom({
+      id: 'preview',
+      type: roomType,
+      x: x - template.defaultWidth / 2,
+      y: y - template.defaultHeight / 2,
+      width: template.defaultWidth,
+      height: template.defaultHeight,
+      rotation: 0,
+      name: '',
+    });
+
+    setPreviewRoom(preview);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
@@ -61,6 +114,7 @@ export function InteriorLayoutEditor() {
         clientY > rect.bottom
       ) {
         setIsDragOver(false);
+        setPreviewRoom(null);
       }
     }
   };
@@ -70,28 +124,29 @@ export function InteriorLayoutEditor() {
     setIsDragOver(false);
 
     const roomType = e.dataTransfer.getData('roomType') as RoomType;
+    setPreviewRoom(null);
     if (!roomType) return;
 
-    const { x, y } = screenToWorld(e.clientX, e.clientY);
     const template = ROOM_TEMPLATES[roomType];
+    const { x, y } = screenToWorld(e.clientX, e.clientY);
 
-    const maxX = plotWidth - wallThickness * 2 - template.defaultWidth;
-    const maxY = plotDepth - wallThickness * 2 - template.defaultHeight;
-    const clampedX = Math.max(0, Math.min(maxX, x - template.defaultWidth / 2));
-    const clampedY = Math.max(0, Math.min(maxY, y - template.defaultHeight / 2));
-
-    const newRoom: Room = {
+    const newRoom: Room = clampRoom({
       id: generateId(),
       type: roomType,
-      x: clampedX,
-      y: clampedY,
+      x: x - template.defaultWidth / 2,
+      y: y - template.defaultHeight / 2,
       width: template.defaultWidth,
       height: template.defaultHeight,
       rotation: 0,
       name: '',
-    };
+    });
 
-    addRoom(newRoom);
+    const success = addRoom(newRoom);
+    if (success) {
+      showNotification('success', `已添加 ${template.name}`);
+    } else {
+      showNotification('error', '放置失败：房间重叠');
+    }
   };
 
   const handleRoomMouseDown = (e: React.MouseEvent, room: Room) => {
@@ -116,10 +171,8 @@ export function InteriorLayoutEditor() {
     let newX = x - dragOffset.x;
     let newY = y - dragOffset.y;
 
-    const maxX = plotWidth - wallThickness * 2 - room.width;
-    const maxY = plotDepth - wallThickness * 2 - room.height;
-    newX = Math.max(0, Math.min(maxX, newX));
-    newY = Math.max(0, Math.min(maxY, newY));
+    newX = Math.max(0, Math.min(innerWidth - room.width, newX));
+    newY = Math.max(0, Math.min(innerHeight - room.height, newY));
 
     moveRoom(draggingRoomId, newX, newY);
   };
@@ -412,6 +465,42 @@ export function InteriorLayoutEditor() {
         {renderGrid()}
         {renderCorridors()}
         {renderRooms()}
+        {previewRoom && (() => {
+          const template = ROOM_TEMPLATES[previewRoom.type];
+          const cx = castleInnerX + (previewRoom.x + previewRoom.width / 2) * scale;
+          const cy = castleInnerY + (previewRoom.y + previewRoom.height / 2) * scale;
+          const w = previewRoom.width * scale;
+          const h = previewRoom.height * scale;
+          const overlap = hasOverlap(previewRoom);
+          const color = overlap ? '#ef4444' : '#22c55e';
+          return (
+            <g transform={`rotate(${previewRoom.rotation} ${cx} ${cy})`} opacity={0.7}>
+              <rect
+                x={cx - w / 2}
+                y={cy - h / 2}
+                width={w}
+                height={h}
+                fill={color}
+                fillOpacity={0.3}
+                stroke={color}
+                strokeWidth={2}
+                strokeDasharray="5 4"
+                rx={4}
+              />
+              <text
+                x={cx}
+                y={cy - 2}
+                textAnchor="middle"
+                dominantBaseline="middle"
+                fontSize={Math.min(w, h) * 0.25}
+                style={{ pointerEvents: 'none' }}
+                opacity={0.8}
+              >
+                {template.icon}
+              </text>
+            </g>
+          );
+        })()}
       </svg>
 
       <div className="absolute bottom-4 left-4 text-xs bg-stone-900/80 px-3 py-2 rounded backdrop-blur-sm text-stone-500">
@@ -428,6 +517,17 @@ export function InteriorLayoutEditor() {
             <div className="text-5xl mb-3 opacity-30">🏰</div>
             <p className="text-stone-600 text-sm">从左侧拖拽房间到城堡内部</p>
           </div>
+        </div>
+      )}
+
+      {showToast && (
+        <div className={`absolute top-20 left-1/2 -translate-x-1/2 px-5 py-2.5 rounded-lg shadow-2xl backdrop-blur-sm font-medium text-sm transition-all animate-[fadeIn_0.2s_ease-out] ${
+          showToast.type === 'error'
+            ? 'bg-red-900/90 text-red-200 border border-red-700/50'
+            : 'bg-green-900/90 text-green-200 border border-green-700/50'
+        }`}>
+          {showToast.type === 'error' ? '⚠️ ' : '✅ '}
+          {showToast.message}
         </div>
       )}
     </div>

@@ -48,53 +48,98 @@ function getRoomCenter(room: Room) {
   return { x: room.x + room.width / 2, y: room.y + room.height / 2 };
 }
 
+function roomsOverlap(a: Room, b: Room): boolean {
+  return !(
+    a.x + a.width <= b.x ||
+    b.x + b.width <= a.x ||
+    a.y + a.height <= b.y ||
+    b.y + b.height <= a.y
+  );
+}
+
+function hasOverlapWithOthers(room: Room, others: Room[], excludeId?: string): boolean {
+  for (const other of others) {
+    if (excludeId && other.id === excludeId) continue;
+    if (roomsOverlap(room, other)) return true;
+  }
+  return false;
+}
+
+function clampRoomToBounds(room: Room, plotWidth: number, plotDepth: number, wallThickness: number): Room {
+  const innerWidth = plotWidth - wallThickness * 2;
+  const innerHeight = plotDepth - wallThickness * 2;
+  return {
+    ...room,
+    x: Math.max(0, Math.min(innerWidth - room.width, room.x)),
+    y: Math.max(0, Math.min(innerHeight - room.height, room.y)),
+  };
+}
+
+interface Edge {
+  from: number;
+  to: number;
+  weight: number;
+}
+
 function generateCorridors(rooms: Room[]): Corridor[] {
   const corridors: Corridor[] = [];
   if (rooms.length < 2) return corridors;
 
-  const corridorWidth = 2;
+  const n = rooms.length;
+  const centers = rooms.map(getRoomCenter);
+  const edges: Edge[] = [];
 
-  for (let i = 0; i < rooms.length; i++) {
-    for (let j = i + 1; j < rooms.length; j++) {
-      const roomA = rooms[i];
-      const roomB = rooms[j];
-      const centerA = getRoomCenter(roomA);
-      const centerB = getRoomCenter(roomB);
-
-      const dx = Math.abs(centerA.x - centerB.x);
-      const dy = Math.abs(centerA.y - centerB.y);
-      const minDist = (roomA.width + roomB.width) / 2 + (roomA.height + roomB.height) / 2 + corridorWidth * 2;
-
-      if (dx + dy < minDist * 1.5) {
-        const midX = (centerA.x + centerB.x) / 2;
-        const path = [
-          { x: centerA.x, y: centerA.y },
-          { x: midX, y: centerA.y },
-          { x: midX, y: centerB.y },
-          { x: centerB.x, y: centerB.y },
-        ];
-
-        let hasOverlap = false;
-        for (const existing of corridors) {
-          if (
-            (existing.fromRoomId === roomA.id && existing.toRoomId === roomB.id) ||
-            (existing.fromRoomId === roomB.id && existing.toRoomId === roomA.id)
-          ) {
-            hasOverlap = true;
-            break;
-          }
-        }
-
-        if (!hasOverlap) {
-          corridors.push({
-            id: generateId(),
-            fromRoomId: roomA.id,
-            toRoomId: roomB.id,
-            path,
-          });
-        }
-      }
+  for (let i = 0; i < n; i++) {
+    for (let j = i + 1; j < n; j++) {
+      const dx = Math.abs(centers[i].x - centers[j].x);
+      const dy = Math.abs(centers[i].y - centers[j].y);
+      edges.push({ from: i, to: j, weight: dx + dy });
     }
+  }
+
+  edges.sort((a, b) => a.weight - b.weight);
+
+  const parent = Array.from({ length: n }, (_, i) => i);
+  function find(x: number): number {
+    if (parent[x] !== x) parent[x] = find(parent[x]);
+    return parent[x];
+  }
+  function union(a: number, b: number): boolean {
+    const ra = find(a);
+    const rb = find(b);
+    if (ra === rb) return false;
+    parent[ra] = rb;
+    return true;
+  }
+
+  const mstEdges: Edge[] = [];
+  for (const edge of edges) {
+    if (union(edge.from, edge.to)) {
+      mstEdges.push(edge);
+      if (mstEdges.length === n - 1) break;
+    }
+  }
+
+  for (const edge of mstEdges) {
+    const roomA = rooms[edge.from];
+    const roomB = rooms[edge.to];
+    const centerA = centers[edge.from];
+    const centerB = centers[edge.to];
+
+    const midX = (centerA.x + centerB.x) / 2;
+    const path = [
+      { x: centerA.x, y: centerA.y },
+      { x: midX, y: centerA.y },
+      { x: midX, y: centerB.y },
+      { x: centerB.x, y: centerB.y },
+    ];
+
+    corridors.push({
+      id: generateId(),
+      fromRoomId: roomA.id,
+      toRoomId: roomB.id,
+      path,
+    });
   }
 
   return corridors;
@@ -140,33 +185,48 @@ export const useCastleStore = create<CastleState>((set, get) => ({
     set((state) => ({
       params: { ...state.params, seed: Math.floor(Math.random() * 100000) },
     })),
-  addRoom: (room: Room) =>
-    set((state) => {
-      const rooms = [...state.interiorLayout.rooms, room];
-      const corridors = generateCorridors(rooms);
-      return {
-        interiorLayout: {
-          ...state.interiorLayout,
-          rooms,
-          corridors,
-          selectedRoomId: room.id,
-        },
-      };
-    }),
-  updateRoom: (id: string, updates: Partial<Room>) =>
-    set((state) => {
-      const rooms = state.interiorLayout.rooms.map((r) =>
-        r.id === id ? { ...r, ...updates } : r
-      );
-      const corridors = generateCorridors(rooms);
-      return {
-        interiorLayout: {
-          ...state.interiorLayout,
-          rooms,
-          corridors,
-        },
-      };
-    }),
+  addRoom: (room: Room) => {
+    const state = get();
+    const clamped = clampRoomToBounds(room, state.params.plotWidth, state.params.plotDepth, state.params.wallThickness);
+    if (hasOverlapWithOthers(clamped, state.interiorLayout.rooms)) {
+      return false;
+    }
+    const rooms = [...state.interiorLayout.rooms, clamped];
+    const corridors = generateCorridors(rooms);
+    set({
+      interiorLayout: {
+        ...state.interiorLayout,
+        rooms,
+        corridors,
+        selectedRoomId: clamped.id,
+      },
+    });
+    return true;
+  },
+  updateRoom: (id: string, updates: Partial<Room>) => {
+    const state = get();
+    const target = state.interiorLayout.rooms.find(r => r.id === id);
+    if (!target) return false;
+    const updated = clampRoomToBounds(
+      { ...target, ...updates },
+      state.params.plotWidth,
+      state.params.plotDepth,
+      state.params.wallThickness
+    );
+    if (hasOverlapWithOthers(updated, state.interiorLayout.rooms, id)) {
+      return false;
+    }
+    const rooms = state.interiorLayout.rooms.map(r => r.id === id ? updated : r);
+    const corridors = generateCorridors(rooms);
+    set({
+      interiorLayout: {
+        ...state.interiorLayout,
+        rooms,
+        corridors,
+      },
+    });
+    return true;
+  },
   deleteRoom: (id: string) =>
     set((state) => {
       const rooms = state.interiorLayout.rooms.filter((r) => r.id !== id);
@@ -187,20 +247,30 @@ export const useCastleStore = create<CastleState>((set, get) => ({
         selectedRoomId: id,
       },
     })),
-  moveRoom: (id: string, x: number, y: number) =>
-    set((state) => {
-      const rooms = state.interiorLayout.rooms.map((r) =>
-        r.id === id ? { ...r, x, y } : r
-      );
-      const corridors = generateCorridors(rooms);
-      return {
-        interiorLayout: {
-          ...state.interiorLayout,
-          rooms,
-          corridors,
-        },
-      };
-    }),
+  moveRoom: (id: string, x: number, y: number) => {
+    const state = get();
+    const target = state.interiorLayout.rooms.find(r => r.id === id);
+    if (!target) return false;
+    const moved = clampRoomToBounds(
+      { ...target, x, y },
+      state.params.plotWidth,
+      state.params.plotDepth,
+      state.params.wallThickness
+    );
+    if (hasOverlapWithOthers(moved, state.interiorLayout.rooms, id)) {
+      return false;
+    }
+    const rooms = state.interiorLayout.rooms.map(r => r.id === id ? moved : r);
+    const corridors = generateCorridors(rooms);
+    set({
+      interiorLayout: {
+        ...state.interiorLayout,
+        rooms,
+        corridors,
+      },
+    });
+    return true;
+  },
   clearAllRooms: () =>
     set((state) => ({
       interiorLayout: {

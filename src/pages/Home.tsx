@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ControlPanel } from '@/components/ControlPanel';
 import { Scene3D } from '@/components/Scene3D';
 import { Toolbar } from '@/components/Toolbar';
@@ -9,21 +9,18 @@ import { HistoryTimeline } from '@/components/HistoryTimeline';
 import { InteriorLayoutEditor } from '@/components/InteriorLayoutEditor';
 import { RoomPanel } from '@/components/RoomPanel';
 import { RoomPropertyPanel } from '@/components/RoomPropertyPanel';
-import { ViewMode } from '@/types/castle';
 import { useCastleStore } from '@/store/useCastleStore';
 import { useSiegeStore } from '@/store/useSiegeStore';
 
 export default function Home() {
-  const [viewMode, setViewMode] = useState<ViewMode>('solid');
   const [showUVPreview, setShowUVPreview] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
-  const { params } = useCastleStore();
+  const { params, viewMode } = useCastleStore();
   const { siegeMode, setSiegeMode } = useSiegeStore();
 
-  const handleViewModeChange = (mode: ViewMode) => {
-    setViewMode(mode);
-    setShowUVPreview(mode === 'uv');
-  };
+  useEffect(() => {
+    setShowUVPreview(viewMode === 'uv');
+  }, [viewMode]);
 
   const handleExport = () => {
     setShowExportDialog(true);
@@ -45,8 +42,6 @@ export default function Home() {
       
       <div className="flex-1 relative">
         <Toolbar
-          viewMode={viewMode}
-          onViewModeChange={handleViewModeChange}
           onExport={handleExport}
           siegeMode={siegeMode}
           onToggleSiegeMode={handleToggleSiegeMode}
