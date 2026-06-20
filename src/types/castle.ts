@@ -1,3 +1,36 @@
+export type HeraldryBaseColor = 'crimson' | 'azure' | 'sable' | 'or' | 'argent' | 'gules' | 'purpure' | 'vert';
+export type HeraldryBorderStyle = 'none' | 'simple' | 'double' | 'indented' | 'wavy' | 'lozengy';
+export type HeraldryCenterPattern = 'lion' | 'eagle' | 'cross' | 'fleur_de_lis' | 'dragon' | 'sword' | 'crown' | 'star';
+export type HeraldryColorScheme = 'classic' | 'royal' | 'warlike' | 'nature' | 'holy' | 'mystic';
+
+export interface HeraldryConfig {
+  baseColor: HeraldryBaseColor;
+  borderStyle: HeraldryBorderStyle;
+  centerPattern: HeraldryCenterPattern;
+  colorScheme: HeraldryColorScheme;
+  applied: boolean;
+}
+
+export const HERALDRY_BASE_COLORS: Record<HeraldryBaseColor, string> = {
+  crimson: '#DC143C',
+  azure: '#1E3A8A',
+  sable: '#1C1C1C',
+  or: '#FFD700',
+  argent: '#E8E8E8',
+  gules: '#CC0000',
+  purpure: '#6B21A8',
+  vert: '#166534',
+};
+
+export const HERALDRY_COLOR_SCHEMES: Record<HeraldryColorScheme, { primary: string; secondary: string; accent: string }> = {
+  classic: { primary: '#DC143C', secondary: '#FFD700', accent: '#1C1C1C' },
+  royal: { primary: '#1E3A8A', secondary: '#FFD700', accent: '#6B21A8' },
+  warlike: { primary: '#CC0000', secondary: '#1C1C1C', accent: '#8B4513' },
+  nature: { primary: '#166534', secondary: '#FFD700', accent: '#8B4513' },
+  holy: { primary: '#E8E8E8', secondary: '#1E3A8A', accent: '#FFD700' },
+  mystic: { primary: '#6B21A8', secondary: '#FFD700', accent: '#1C1C1C' },
+};
+
 export type TowerShape = 'square' | 'round' | 'polygonal' | 'd_shaped';
 export type CrenellationStyle = 'simple' | 'decorated' | 'machicolated' | 'cross_shaped';
 

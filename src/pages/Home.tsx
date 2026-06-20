@@ -9,14 +9,18 @@ import { HistoryTimeline } from '@/components/HistoryTimeline';
 import { InteriorLayoutEditor } from '@/components/InteriorLayoutEditor';
 import { RoomPanel } from '@/components/RoomPanel';
 import { RoomPropertyPanel } from '@/components/RoomPropertyPanel';
+import { HeraldryPanel } from '@/components/HeraldryPanel';
 import { useCastleStore } from '@/store/useCastleStore';
 import { useSiegeStore } from '@/store/useSiegeStore';
+import { useHeraldryStore } from '@/store/useHeraldryStore';
 
 export default function Home() {
   const [showUVPreview, setShowUVPreview] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const { params, viewMode } = useCastleStore();
   const { siegeMode, setSiegeMode } = useSiegeStore();
+  const showHeraldryPanel = useHeraldryStore((s) => s.showPanel);
+  const heraldryApplied = useHeraldryStore((s) => s.config.applied);
 
   useEffect(() => {
     setShowUVPreview(viewMode === 'uv');
@@ -30,15 +34,16 @@ export default function Home() {
     setSiegeMode(!siegeMode);
   };
 
+  const getSidePanel = () => {
+    if (showHeraldryPanel) return <HeraldryPanel />;
+    if (viewMode === 'interior') return <RoomPanel onDragStart={() => {}} />;
+    if (siegeMode) return <SiegeControlPanel />;
+    return <ControlPanel />;
+  };
+
   return (
     <div className="w-full h-screen flex bg-stone-950 overflow-hidden">
-      {viewMode === 'interior' ? (
-        <RoomPanel onDragStart={() => {}} />
-      ) : siegeMode ? (
-        <SiegeControlPanel />
-      ) : (
-        <ControlPanel />
-      )}
+      {getSidePanel()}
       
       <div className="flex-1 relative">
         <Toolbar
@@ -78,6 +83,12 @@ export default function Home() {
                 <>
                   <span>|</span>
                   <span className="text-red-400">⚔️ 攻防模式</span>
+                </>
+              )}
+              {heraldryApplied && (
+                <>
+                  <span>|</span>
+                  <span className="text-purple-400">🛡️ 纹章已应用</span>
                 </>
               )}
             </div>

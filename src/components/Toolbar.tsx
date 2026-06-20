@@ -1,5 +1,6 @@
-import { Download, Grid3X3, Box, Shuffle, RotateCcw, Eye, Swords, LayoutGrid } from 'lucide-react';
+import { Download, Grid3X3, Box, Shuffle, RotateCcw, Eye, Swords, LayoutGrid, Shield } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
+import { useHeraldryStore } from '@/store/useHeraldryStore';
 import { ViewMode } from '@/types/castle';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +12,7 @@ interface ToolbarProps {
 
 export function Toolbar({ onExport, siegeMode, onToggleSiegeMode }: ToolbarProps) {
   const { viewMode, setViewMode, resetParams, randomizeSeed } = useCastleStore();
+  const { showPanel, togglePanel, config } = useHeraldryStore();
 
   const viewModes: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
     { mode: 'solid', label: '实体', icon: <Box className="w-4 h-4" /> },
@@ -34,6 +36,21 @@ export function Toolbar({ onExport, siegeMode, onToggleSiegeMode }: ToolbarProps
         >
           <Swords className="w-4 h-4" />
           <span className="hidden sm:inline">攻防</span>
+        </button>
+        <button
+          onClick={togglePanel}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all',
+            showPanel
+              ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/30'
+              : config.applied
+                ? 'bg-purple-600/20 text-purple-300 hover:bg-purple-600/30'
+                : 'text-stone-400 hover:text-purple-400 hover:bg-stone-800'
+          )}
+          title="纹章设计"
+        >
+          <Shield className="w-4 h-4" />
+          <span className="hidden sm:inline">纹章</span>
         </button>
       </div>
 
