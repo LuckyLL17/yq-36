@@ -1,4 +1,4 @@
-import { RefreshCw, Download, Grid3X3, Box, Shuffle, RotateCcw, Eye } from 'lucide-react';
+import { Download, Grid3X3, Box, Shuffle, RotateCcw, Eye, Swords } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { ViewMode } from '@/types/castle';
 import { cn } from '@/lib/utils';
@@ -7,9 +7,11 @@ interface ToolbarProps {
   viewMode: ViewMode;
   onViewModeChange: (mode: ViewMode) => void;
   onExport: () => void;
+  siegeMode: boolean;
+  onToggleSiegeMode: () => void;
 }
 
-export function Toolbar({ viewMode, onViewModeChange, onExport }: ToolbarProps) {
+export function Toolbar({ viewMode, onViewModeChange, onExport, siegeMode, onToggleSiegeMode }: ToolbarProps) {
   const { resetParams, randomizeSeed } = useCastleStore();
 
   const viewModes: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
@@ -20,6 +22,22 @@ export function Toolbar({ viewMode, onViewModeChange, onExport }: ToolbarProps) 
 
   return (
     <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1 px-2 py-1.5 bg-stone-900/90 backdrop-blur-sm rounded-lg border border-amber-900/30 shadow-xl">
+      <div className="flex items-center gap-0.5 pr-2 border-r border-stone-700">
+        <button
+          onClick={onToggleSiegeMode}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all',
+            siegeMode
+              ? 'bg-red-600 text-white shadow-lg shadow-red-600/30'
+              : 'text-stone-400 hover:text-red-400 hover:bg-stone-800'
+          )}
+          title="攻防沙盘"
+        >
+          <Swords className="w-4 h-4" />
+          <span className="hidden sm:inline">攻防</span>
+        </button>
+      </div>
+
       <div className="flex items-center gap-0.5 pr-2 border-r border-stone-700">
         {viewModes.map(({ mode, label, icon }) => (
           <button

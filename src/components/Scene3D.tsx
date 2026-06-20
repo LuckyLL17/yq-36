@@ -1,14 +1,16 @@
-import { useRef, useState } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Grid, Environment, ContactShadows } from '@react-three/drei';
-import { EffectComposer, Bloom, SSAO } from '@react-three/postprocessing';
-import * as THREE from 'three';
+import { useRef } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, Grid, ContactShadows } from '@react-three/drei';
+import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { Castle } from './Castle';
+import { SiegeScene } from './SiegeScene';
 import { useCastleStore } from '@/store/useCastleStore';
+import { useSiegeStore } from '@/store/useSiegeStore';
 import { ViewMode } from '@/types/castle';
 
 function CameraController() {
   const { params } = useCastleStore();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const controlsRef = useRef<any>(null);
 
   return (
@@ -51,19 +53,21 @@ function Lighting() {
 
 function SceneContent({ viewMode }: { viewMode: ViewMode }) {
   const { params } = useCastleStore();
+  const siegeMode = useSiegeStore((s) => s.siegeMode);
 
   return (
     <>
       <Castle params={params} viewMode={viewMode} />
+      <SiegeScene />
       <Grid
         position={[0, -0.09, 0]}
         args={[200, 200]}
         cellSize={5}
         cellThickness={0.5}
-        cellColor="#4a5568"
+        cellColor={siegeMode ? '#4a3535' : '#4a5568'}
         sectionSize={25}
         sectionThickness={1}
-        sectionColor="#718096"
+        sectionColor={siegeMode ? '#715050' : '#718096'}
         fadeDistance={100}
         fadeStrength={1}
         followCamera={false}
@@ -82,6 +86,10 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
 }
 
 export function Scene3D({ viewMode }: { viewMode: ViewMode }) {
+  const siegeMode = useSiegeStore((s) => s.siegeMode);
+  const bgColor = siegeMode ? '#1a0e0e' : '#1a1a2e';
+  const fogColor = siegeMode ? '#1a0e0e' : '#1a1a2e';
+
   return (
     <Canvas
       shadows
@@ -89,8 +97,8 @@ export function Scene3D({ viewMode }: { viewMode: ViewMode }) {
       gl={{ antialias: true, alpha: false }}
       dpr={[1, 2]}
     >
-      <color attach="background" args={['#1a1a2e']} />
-      <fog attach="fog" args={['#1a1a2e', 80, 180]} />
+      <color attach="background" args={[bgColor]} />
+      <fog attach="fog" args={[fogColor, 80, 180]} />
       
       <Lighting />
       <CameraController />
