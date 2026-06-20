@@ -5,6 +5,7 @@ import { Toolbar } from '@/components/Toolbar';
 import { UVPreview } from '@/components/UVPreview';
 import { ExportDialog } from '@/components/ExportDialog';
 import { SiegeControlPanel } from '@/components/SiegeControlPanel';
+import { HistoryTimeline } from '@/components/HistoryTimeline';
 import { ViewMode } from '@/types/castle';
 import { useCastleStore } from '@/store/useCastleStore';
 import { useSiegeStore } from '@/store/useSiegeStore';
@@ -44,6 +45,8 @@ export default function Home() {
         
         <Scene3D viewMode={viewMode} />
         
+        {!siegeMode && <HistoryTimeline />}
+        
         {showUVPreview && (
           <UVPreview onClose={() => setShowUVPreview(false)} />
         )}
@@ -56,6 +59,12 @@ export default function Home() {
             <span>塔楼: {params.towerCount}</span>
             <span>|</span>
             <span>建筑: {params.buildingCount}</span>
+            {!siegeMode && (
+              <>
+                <span>|</span>
+                <span className="text-amber-500">📜 {params.eraYear}年</span>
+              </>
+            )}
             {siegeMode && (
               <>
                 <span>|</span>

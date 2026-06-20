@@ -1,3 +1,6 @@
+export type TowerShape = 'square' | 'round' | 'polygonal' | 'd_shaped';
+export type CrenellationStyle = 'simple' | 'decorated' | 'machicolated' | 'cross_shaped';
+
 export interface CastleParams {
   plotWidth: number;
   plotDepth: number;
@@ -14,6 +17,9 @@ export interface CastleParams {
   buildingCount: number;
   buildingHeight: number;
   seed: number;
+  eraYear: number;
+  towerShape: TowerShape;
+  crenellationStyle: CrenellationStyle;
 }
 
 export interface CastleMeshData {
@@ -31,9 +37,12 @@ export interface CastleState {
   params: CastleParams;
   viewMode: ViewMode;
   castleGeometries: CastleMeshData | null;
+  selectedEraId: string | null;
   setParams: (params: Partial<CastleParams>) => void;
   setViewMode: (mode: ViewMode) => void;
   setCastleGeometries: (geometries: CastleMeshData | null) => void;
+  setSelectedEraId: (id: string | null) => void;
+  applyEraStyle: (year: number) => void;
   resetParams: () => void;
   randomizeSeed: () => void;
 }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CastleParams } from '@/types/castle';
+import { CastleParams, CrenellationStyle, TowerShape } from '@/types/castle';
 import { SeededRandom } from '@/utils/seededRandom';
 
 export class CastleGenerator {
@@ -27,9 +27,9 @@ export class CastleGenerator {
     return points;
   }
 
-  generateWalls(plotPoints: THREE.Vector2[]): THREE.BufferGeometry[] {
+  generateWalls(plotPoints: THREE.Vector2[], crenellationHeightMultiplier = 1.0): THREE.BufferGeometry[] {
     const walls: THREE.BufferGeometry[] = [];
-    const { wallHeight, wallThickness } = this.params;
+    const { wallHeight, wallThickness, crenellationStyle } = this.params;
 
     for (let i = 0; i < plotPoints.length; i++) {
       const p1 = plotPoints[i];
@@ -38,7 +38,7 @@ export class CastleGenerator {
       const wallGeo = this.createWallSegment(p1, p2, wallHeight, wallThickness);
       walls.push(wallGeo);
       
-      const crenellationGeo = this.createCrenellations(p1, p2, wallHeight, wallThickness);
+      const crenellationGeo = this.createCrenellations(p1, p2, wallHeight, wallThickness, crenellationStyle, crenellationHeightMultiplier);
       walls.push(crenellationGeo);
     }
 
@@ -70,7 +70,9 @@ export class CastleGenerator {
     p1: THREE.Vector2,
     p2: THREE.Vector2,
     wallHeight: number,
-    wallThickness: number
+    wallThickness: number,
+    style: CrenellationStyle = 'simple',
+    heightMultiplier: number = 1.0
   ): THREE.BufferGeometry {
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
@@ -78,17 +80,50 @@ export class CastleGenerator {
     const angle = Math.atan2(dy, dx);
     
     const crenellationWidth = 1.2;
-    const crenellationHeight = 1.5;
-    const gap = 1.2;
+    const crenellationHeight = 1.5 * heightMultiplier;
+    const gap = style === 'cross_shaped' ? 0.8 : 1.2;
     const count = Math.floor(length / (crenellationWidth + gap));
 
     const geometries: THREE.BufferGeometry[] = [];
     
     for (let i = 0; i < count; i++) {
       const x = i * (crenellationWidth + gap) + gap / 2;
-      const geo = new THREE.BoxGeometry(crenellationWidth, crenellationHeight, wallThickness * 1.05);
-      geo.translate(x + crenellationWidth / 2, wallHeight + crenellationHeight / 2, 0);
-      geometries.push(geo);
+      const centerX = x + crenellationWidth / 2;
+      const centerY = wallHeight + crenellationHeight / 2;
+
+      if (style === 'simple') {
+        const geo = new THREE.BoxGeometry(crenellationWidth, crenellationHeight, wallThickness * 1.05);
+        geo.translate(centerX, centerY, 0);
+        geometries.push(geo);
+      } else if (style === 'decorated') {
+        const mainGeo = new THREE.BoxGeometry(crenellationWidth, crenellationHeight, wallThickness * 1.05);
+        mainGeo.translate(centerX, centerY, 0);
+        geometries.push(mainGeo);
+        const capGeo = new THREE.BoxGeometry(crenellationWidth * 0.8, crenellationHeight * 0.2, wallThickness * 1.15);
+        capGeo.translate(centerX, wallHeight + crenellationHeight * 0.9, 0);
+        geometries.push(capGeo);
+      } else if (style === 'machicolated') {
+        const mainGeo = new THREE.BoxGeometry(crenellationWidth, crenellationHeight, wallThickness * 1.05);
+        mainGeo.translate(centerX, centerY, 0);
+        geometries.push(mainGeo);
+        const machicolationHeight = 0.5;
+        const overhangGeo = new THREE.BoxGeometry(crenellationWidth, machicolationHeight, wallThickness * 1.4);
+        overhangGeo.translate(centerX, wallHeight - machicolationHeight / 2, 0);
+        geometries.push(overhangGeo);
+        const holeWidth = crenellationWidth * 0.4;
+        const holeGeo = new THREE.BoxGeometry(holeWidth, machicolationHeight * 0.6, wallThickness * 1.42);
+        holeGeo.translate(centerX, wallHeight - machicolationHeight / 2, 0);
+        geometries.push(holeGeo);
+      } else if (style === 'cross_shaped') {
+        const mainGeo = new THREE.BoxGeometry(crenellationWidth, crenellationHeight, wallThickness * 1.05);
+        mainGeo.translate(centerX, centerY, 0);
+        geometries.push(mainGeo);
+        const crossBarWidth = crenellationWidth * 1.3;
+        const crossBarHeight = crenellationHeight * 0.3;
+        const crossBarGeo = new THREE.BoxGeometry(crossBarWidth, crossBarHeight, wallThickness * 1.1);
+        crossBarGeo.translate(centerX, centerY, 0);
+        geometries.push(crossBarGeo);
+      }
     }
 
     const merged = this.mergeGeometries(geometries);
@@ -100,10 +135,10 @@ export class CastleGenerator {
 
   generateTowers(plotPoints: THREE.Vector2[]): THREE.BufferGeometry[] {
     const towers: THREE.BufferGeometry[] = [];
-    const { towerCount, towerHeight, towerRadius } = this.params;
+    const { towerCount, towerHeight, towerRadius, towerShape } = this.params;
 
     for (let i = 0; i < plotPoints.length; i++) {
-      const tower = this.createTower(plotPoints[i], towerHeight, towerRadius);
+      const tower = this.createTower(plotPoints[i], towerHeight, towerRadius, towerShape);
       towers.push(tower);
     }
 
@@ -119,7 +154,7 @@ export class CastleGenerator {
       );
       const h = towerHeight * (0.8 + this.rng.range(0, 0.4));
       const r = towerRadius * (0.8 + this.rng.range(0, 0.3));
-      const tower = this.createTower(midPoint, h, r);
+      const tower = this.createTower(midPoint, h, r, towerShape);
       towers.push(tower);
     }
 
@@ -129,30 +164,139 @@ export class CastleGenerator {
   private createTower(
     position: THREE.Vector2,
     height: number,
-    radius: number
+    radius: number,
+    shape: TowerShape = 'round'
   ): THREE.BufferGeometry {
     const geometries: THREE.BufferGeometry[] = [];
 
-    const bodyGeo = new THREE.CylinderGeometry(radius, radius * 1.1, height, 8);
-    bodyGeo.translate(0, height / 2, 0);
-    geometries.push(bodyGeo);
+    if (shape === 'square') {
+      const size = radius * 1.8;
+      const bodyGeo = new THREE.BoxGeometry(size, height, size);
+      bodyGeo.translate(0, height / 2, 0);
+      geometries.push(bodyGeo);
 
-    const roofHeight = radius * 1.2;
-    const roofGeo = new THREE.ConeGeometry(radius * 1.2, roofHeight, 8);
-    roofGeo.translate(0, height + roofHeight / 2, 0);
-    geometries.push(roofGeo);
+      const roofHeight = radius * 1.0;
+      const roofGeo = new THREE.ConeGeometry(radius * 1.5, roofHeight, 4);
+      roofGeo.rotateY(Math.PI / 4);
+      roofGeo.translate(0, height + roofHeight / 2, 0);
+      geometries.push(roofGeo);
 
-    const windowCount = 3;
-    for (let i = 0; i < windowCount; i++) {
-      const angle = (i / windowCount) * Math.PI * 2;
-      const windowGeo = new THREE.BoxGeometry(0.8, 1.5, 0.3);
-      windowGeo.translate(
-        Math.cos(angle) * (radius - 0.1),
-        height * 0.5 + i * 1.5 - 1.5,
-        Math.sin(angle) * (radius - 0.1)
-      );
-      windowGeo.rotateY(angle);
-      geometries.push(windowGeo);
+      for (let side = 0; side < 4; side++) {
+        const angle = (side / 4) * Math.PI * 2 + Math.PI / 4;
+        const windowCount = 3;
+        for (let i = 0; i < windowCount; i++) {
+          const windowGeo = new THREE.BoxGeometry(0.8, 1.2, 0.3);
+          windowGeo.translate(
+            Math.cos(angle) * (size / 2 - 0.05),
+            2 + i * 2.5,
+            Math.sin(angle) * (size / 2 - 0.05)
+          );
+          windowGeo.rotateY(angle);
+          geometries.push(windowGeo);
+        }
+      }
+    } else if (shape === 'round') {
+      const bodyGeo = new THREE.CylinderGeometry(radius, radius * 1.1, height, 16);
+      bodyGeo.translate(0, height / 2, 0);
+      geometries.push(bodyGeo);
+
+      const roofHeight = radius * 1.2;
+      const roofGeo = new THREE.ConeGeometry(radius * 1.2, roofHeight, 16);
+      roofGeo.translate(0, height + roofHeight / 2, 0);
+      geometries.push(roofGeo);
+
+      const windowCount = 5;
+      for (let i = 0; i < windowCount; i++) {
+        const angle = (i / windowCount) * Math.PI * 2;
+        const windowGeo = new THREE.BoxGeometry(0.8, 1.5, 0.3);
+        windowGeo.translate(
+          Math.cos(angle) * (radius - 0.1),
+          height * 0.5 + i * 1.2 - 1.2,
+          Math.sin(angle) * (radius - 0.1)
+        );
+        windowGeo.rotateY(angle);
+        geometries.push(windowGeo);
+      }
+    } else if (shape === 'polygonal') {
+      const sides = 6;
+      const bodyGeo = new THREE.CylinderGeometry(radius, radius * 1.1, height, sides);
+      bodyGeo.translate(0, height / 2, 0);
+      geometries.push(bodyGeo);
+
+      const roofHeight = radius * 1.3;
+      const roofGeo = new THREE.ConeGeometry(radius * 1.25, roofHeight, sides);
+      roofGeo.translate(0, height + roofHeight / 2, 0);
+      geometries.push(roofGeo);
+
+      for (let i = 0; i < sides; i++) {
+        const angle = (i / sides) * Math.PI * 2 + Math.PI / sides;
+        const windowGeo = new THREE.BoxGeometry(0.8, 1.4, 0.3);
+        windowGeo.translate(
+          Math.cos(angle) * (radius - 0.15),
+          height * 0.4 + (i % 3) * 1.8,
+          Math.sin(angle) * (radius - 0.15)
+        );
+        windowGeo.rotateY(angle);
+        geometries.push(windowGeo);
+      }
+
+      const pinnacleCount = sides;
+      for (let i = 0; i < pinnacleCount; i++) {
+        const angle = (i / pinnacleCount) * Math.PI * 2;
+        const pinnacleGeo = new THREE.ConeGeometry(radius * 0.15, radius * 0.6, 4);
+        pinnacleGeo.translate(
+          Math.cos(angle) * radius * 1.15,
+          height,
+          Math.sin(angle) * radius * 1.15
+        );
+        geometries.push(pinnacleGeo);
+      }
+    } else if (shape === 'd_shaped') {
+      const flatSize = radius * 1.5;
+      const curvePoints: THREE.Vector2[] = [];
+      const segments = 12;
+      for (let i = 0; i <= segments; i++) {
+        const angle = Math.PI + (i / segments) * Math.PI;
+        curvePoints.push(new THREE.Vector2(
+          Math.cos(angle) * radius,
+          Math.sin(angle) * radius
+        ));
+      }
+      const flatPoints = [
+        new THREE.Vector2(flatSize / 2, radius),
+        new THREE.Vector2(-flatSize / 2, radius),
+      ];
+      const allPoints = [...curvePoints, ...flatPoints];
+      const shape = new THREE.Shape();
+      shape.moveTo(allPoints[0].x, allPoints[0].y);
+      for (let i = 1; i < allPoints.length; i++) {
+        shape.lineTo(allPoints[i].x, allPoints[i].y);
+      }
+      shape.closePath();
+
+      const extrudeSettings = { depth: height, bevelEnabled: false };
+      const bodyGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+      bodyGeo.rotateX(-Math.PI / 2);
+      bodyGeo.translate(0, 0, 0);
+      bodyGeo.translate(0, height / 2, 0);
+      geometries.push(bodyGeo);
+
+      const roofHeight = radius * 1.1;
+      const roofGeo = new THREE.ConeGeometry(radius * 1.15, roofHeight, 8);
+      roofGeo.translate(0, height + roofHeight / 2, 0);
+      geometries.push(roofGeo);
+
+      for (let i = 0; i < 3; i++) {
+        const angle = Math.PI + 0.3 + (i / 3) * (Math.PI * 0.4);
+        const windowGeo = new THREE.BoxGeometry(0.7, 1.3, 0.3);
+        windowGeo.translate(
+          Math.cos(angle) * (radius - 0.1),
+          height * 0.4 + i * 1.8,
+          Math.sin(angle) * (radius - 0.1)
+        );
+        windowGeo.rotateY(angle);
+        geometries.push(windowGeo);
+      }
     }
 
     const merged = this.mergeGeometries(geometries);
@@ -162,7 +306,7 @@ export class CastleGenerator {
   }
 
   generateGate(plotPoints: THREE.Vector2[]): THREE.BufferGeometry {
-    const { gateWidth, gateHeight, wallHeight, wallThickness } = this.params;
+    const { gateWidth, gateHeight, wallThickness } = this.params;
     
     const p1 = plotPoints[0];
     const p2 = plotPoints[1];
@@ -350,7 +494,7 @@ export class CastleGenerator {
     return merged;
   }
 
-  generateGround(plotPoints: THREE.Vector2[]): THREE.BufferGeometry {
+  generateGround(): THREE.BufferGeometry {
     const { hasMoat, moatWidth } = this.params;
     const padding = hasMoat ? moatWidth + 20 : 20;
     
@@ -365,8 +509,6 @@ export class CastleGenerator {
 
     const positions = geometry.attributes.position;
     for (let i = 0; i < positions.count; i++) {
-      const x = positions.getX(i);
-      const z = positions.getZ(i);
       const noise = this.rng.range(-0.2, 0.2);
       positions.setY(i, -0.1 + noise);
     }
@@ -500,7 +642,7 @@ export class CastleGenerator {
     uvs.needsUpdate = true;
   }
 
-  generateAll(): {
+  generateAll(crenellationHeightMultiplier = 1.0): {
     plotPoints: THREE.Vector2[];
     walls: THREE.BufferGeometry[];
     towers: THREE.BufferGeometry[];
@@ -512,12 +654,12 @@ export class CastleGenerator {
     const plotPoints = this.generatePlotPoints();
     return {
       plotPoints,
-      walls: this.generateWalls(plotPoints),
+      walls: this.generateWalls(plotPoints, crenellationHeightMultiplier),
       towers: this.generateTowers(plotPoints),
       gate: this.generateGate(plotPoints),
       moat: this.generateMoat(plotPoints),
       buildings: this.generateBuildings(plotPoints),
-      ground: this.generateGround(plotPoints),
+      ground: this.generateGround(),
     };
   }
 }

@@ -6,6 +6,7 @@ import { CastleGenerator } from '@/utils/CastleGenerator';
 import { MaterialFactory } from '@/utils/MaterialFactory';
 import { UVUnwrapper, UVIsland } from '@/utils/UVUnwrapper';
 import { useCastleStore } from '@/store/useCastleStore';
+import { getInterpolatedStyle } from '@/data/historicalEras';
 
 interface CastleProps {
   params: CastleParams;
@@ -18,7 +19,8 @@ export function Castle({ params, viewMode }: CastleProps) {
 
   const { walls, towers, gate, moat, buildings, ground, uvGeometries } = useMemo(() => {
     const generator = new CastleGenerator(params);
-    const result = generator.generateAll();
+    const style = getInterpolatedStyle(params.eraYear);
+    const result = generator.generateAll(style.crenellationHeightMultiplier);
     
     const uvGeos: THREE.BufferGeometry[] = [];
     const islands: UVIsland[] = [];

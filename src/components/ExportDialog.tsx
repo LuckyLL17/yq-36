@@ -165,7 +165,7 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
         case 'gltf':
           await ModelExporter.exportGLTF(exportGroup, filename);
           break;
-        case 'obj':
+        case 'obj': {
           const geos: THREE.BufferGeometry[] = [];
           exportGroup.traverse((child) => {
             if (child instanceof THREE.Mesh && child.geometry) {
@@ -174,6 +174,7 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
           });
           ModelExporter.exportOBJ(geos, filename);
           break;
+        }
       }
 
       setExportStatus('success');
