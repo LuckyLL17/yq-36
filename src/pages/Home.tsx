@@ -67,7 +67,7 @@ export default function Home() {
         {viewMode !== 'interior' && (
           <div className="absolute bottom-4 left-4 text-xs bg-stone-900/80 px-3 py-2 rounded backdrop-blur-sm"
             style={{ color: siegeMode ? '#ef4444' : '#78716c' }}>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 flex-wrap">
               <span>种子: {params.seed}</span>
               <span>|</span>
               <span>塔楼: {params.towerCount}</span>
@@ -75,6 +75,19 @@ export default function Home() {
               <span>建筑: {params.buildingCount}</span>
               {!siegeMode && (
                 <>
+                  <span>|</span>
+                  <span className="text-sky-400">
+                    {params.weather === 'sunny' ? '☀️ 晴天' : params.weather === 'rainy' ? '🌧️ 雨天' : params.weather === 'snowy' ? '❄️ 雪天' : '🌫️ 雾天'}
+                  </span>
+                  <span>|</span>
+                  <span className="text-amber-500">
+                    {(() => {
+                      const h = Math.floor(params.timeOfDay);
+                      const m = Math.floor((params.timeOfDay - h) * 60);
+                      const emoji = params.timeOfDay < 5 || params.timeOfDay >= 20 ? '🌙' : params.timeOfDay < 7 ? '🌅' : params.timeOfDay < 10 ? '🌄' : params.timeOfDay < 17 ? '☀️' : params.timeOfDay < 19 ? '🌇' : '🌆';
+                      return `${emoji} ${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+                    })()}
+                  </span>
                   <span>|</span>
                   <span className="text-amber-500">📜 {params.eraYear}年</span>
                 </>

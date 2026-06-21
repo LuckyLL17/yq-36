@@ -1,12 +1,27 @@
-import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain } from 'lucide-react';
+import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { CollapsibleSection } from './CollapsibleSection';
 import { SliderControl } from './SliderControl';
 import { ToggleControl } from './ToggleControl';
-import { TerrainType, TERRAIN_PRESETS } from '@/types/castle';
+import { TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS } from '@/types/castle';
+
+function formatTime(hours: number): string {
+  const h = Math.floor(hours);
+  const m = Math.floor((hours - h) * 60);
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+}
+
+function getTimeEmoji(hours: number): string {
+  if (hours < 5 || hours >= 20) return '🌙';
+  if (hours < 7) return '🌅';
+  if (hours < 10) return '🌄';
+  if (hours < 17) return '☀️';
+  if (hours < 19) return '🌇';
+  return '🌆';
+}
 
 export function ControlPanel() {
-  const { params, setParams, applyTerrainType } = useCastleStore();
+  const { params, setParams, applyTerrainType, applyWeather, setTimeOfDay } = useCastleStore();
 
   return (
     <div className="w-80 bg-stone-900/95 backdrop-blur-sm border-r border-amber-900/30 flex flex-col h-full">
@@ -79,6 +94,110 @@ export function ControlPanel() {
             step={0.005}
             onChange={(v) => setParams({ terrainScale: v })}
           />
+        </CollapsibleSection>
+
+        <CollapsibleSection title="天气环境" icon={<CloudSun className="w-4 h-4" />}>
+          <div className="space-y-2 mb-3">
+            <p className="text-xs text-stone-400">选择天气类型</p>
+            <div className="grid grid-cols-4 gap-2">
+              {(Object.keys(WEATHER_PRESETS) as WeatherType[]).map((type) => {
+                const preset = WEATHER_PRESETS[type];
+                const isSelected = params.weather === type;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => applyWeather(type)}
+                    className={`p-2 rounded-lg border transition-all text-center ${
+                      isSelected
+                        ? 'bg-sky-600/30 border-sky-500 ring-1 ring-sky-500'
+                        : 'bg-stone-800/50 border-stone-700 hover:bg-stone-700/50 hover:border-stone-600'
+                    }`}
+                  >
+                    <div className="text-lg mb-0.5">{preset.icon}</div>
+                    <div className={`text-xs font-medium ${isSelected ? 'text-sky-300' : 'text-stone-300'}`}>
+                      {preset.name}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-stone-500 italic">
+              {WEATHER_PRESETS[params.weather].description}
+            </p>
+          </div>
+          <div className="space-y-1.5 mb-3">
+            <div className="flex justify-between items-center text-xs">
+              <label className="text-stone-400 font-medium flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                时间滑块
+              </label>
+              <span className="text-amber-500 font-mono tabular-nums">
+                {getTimeEmoji(params.timeOfDay)} {formatTime(params.timeOfDay)}
+              </span>
+            </div>
+            <div className="flex gap-2 items-center">
+              <span className="text-xs text-indigo-400">🌙</span>
+              <div className="relative flex-1">
+                <input
+                  type="range"
+                  min={0}
+                  max={24}
+                  step={0.1}
+                  value={params.timeOfDay}
+                  onChange={(e) => setTimeOfDay(parseFloat(e.target.value))}
+                  className="w-full h-2 rounded-full appearance-none cursor-pointer
+                    [&::-webkit-slider-thumb]:appearance-none
+                    [&::-webkit-slider-thumb]:w-4
+                    [&::-webkit-slider-thumb]:h-4
+                    [&::-webkit-slider-thumb]:rounded-full
+                    [&::-webkit-slider-thumb]:bg-amber-500
+                    [&::-webkit-slider-thumb]:cursor-pointer
+                    [&::-webkit-slider-thumb]:shadow-lg
+                    [&::-webkit-slider-thumb]:shadow-amber-500/30
+                    [&::-webkit-slider-thumb]:transition-transform
+                    [&::-webkit-slider-thumb]:hover:scale-110
+                    [&::-moz-range-thumb]:w-4
+                    [&::-moz-range-thumb]:h-4
+                    [&::-moz-range-thumb]:rounded-full
+                    [&::-moz-range-thumb]:bg-amber-500
+                    [&::-moz-range-thumb]:border-none
+                    [&::-moz-range-thumb]:cursor-pointer"
+                  style={{
+                    background: `linear-gradient(to right, #312e81 0%, #f97316 25%, #fcd34d 50%, #f97316 75%, #312e81 100%)`,
+                  }}
+                />
+              </div>
+              <span className="text-xs text-indigo-400">🌙</span>
+            </div>
+            <div className="flex justify-between text-[10px] text-stone-500 font-mono">
+              <span>00:00</span>
+              <span>06:00</span>
+              <span>12:00</span>
+              <span>18:00</span>
+              <span>24:00</span>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5">
+            {[
+              { label: '深夜', value: 2, emoji: '🌙' },
+              { label: '日出', value: 6, emoji: '🌅' },
+              { label: '正午', value: 12, emoji: '☀️' },
+              { label: '日落', value: 18, emoji: '🌇' },
+            ].map((preset) => (
+              <button
+                key={preset.label}
+                onClick={() => setTimeOfDay(preset.value)}
+                className={`px-2 py-1.5 rounded border text-xs transition-all ${
+                  Math.abs(params.timeOfDay - preset.value) < 0.5
+                    ? 'bg-amber-600/30 border-amber-500 text-amber-300'
+                    : 'bg-stone-800/50 border-stone-700 text-stone-400 hover:bg-stone-700/50 hover:border-stone-600 hover:text-stone-300'
+                }`}
+              >
+                <div className="text-sm">{preset.emoji}</div>
+                <div className="text-[10px]">{preset.label}</div>
+              </button>
+            ))}
+          </div>
         </CollapsibleSection>
 
         <CollapsibleSection title="地块设置" icon={<Shield className="w-4 h-4" />}>

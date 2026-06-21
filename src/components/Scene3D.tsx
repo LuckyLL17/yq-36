@@ -6,6 +6,8 @@ import { Castle } from './Castle';
 import { SiegeScene } from './SiegeScene';
 import { Flag3D } from './Flag3D';
 import { HeraldryDecoration } from './HeraldryDecoration';
+import { WeatherParticles } from './WeatherParticles';
+import { DynamicLighting, getEnvironmentConfig, getLightingConfig } from './DynamicLighting';
 import { useCastleStore } from '@/store/useCastleStore';
 import { useSiegeStore } from '@/store/useSiegeStore';
 import { CastleGenerator } from '@/utils/CastleGenerator';
@@ -29,29 +31,6 @@ function CameraController() {
       maxPolarAngle={Math.PI / 2.1}
       target={[0, params.wallHeight / 2, 0]}
     />
-  );
-}
-
-function Lighting() {
-  return (
-    <>
-      <ambientLight intensity={0.4} color="#ffeedd" />
-      <hemisphereLight args={['#ffeedd', '#3d5c3d', 0.5]} />
-      <directionalLight
-        position={[30, 40, 20]}
-        intensity={1.2}
-        castShadow
-        shadow-mapSize-width={2048}
-        shadow-mapSize-height={2048}
-        shadow-camera-far={100}
-        shadow-camera-left={-60}
-        shadow-camera-right={60}
-        shadow-camera-top={60}
-        shadow-camera-bottom={-60}
-        shadow-bias={-0.0001}
-      />
-      <directionalLight position={[-20, 20, -30]} intensity={0.3} color="#aaccff" />
-    </>
   );
 }
 
@@ -195,6 +174,7 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
         flagHeight={1.8}
       />
       <SiegeScene viewMode={viewMode} />
+      <WeatherParticles weather={params.weather} />
       <Grid
         position={[0, -0.5, 0]}
         args={[200, 200]}
@@ -222,9 +202,25 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
 }
 
 export function Scene3D({ viewMode }: { viewMode: ViewMode }) {
+  const { params } = useCastleStore();
   const siegeMode = useSiegeStore((s) => s.siegeMode);
-  const bgColor = siegeMode ? '#1a0e0e' : '#1a1a2e';
-  const fogColor = siegeMode ? '#1a0e0e' : '#1a1a2e';
+  const weather = params.weather;
+  const timeOfDay = params.timeOfDay;
+
+  const environment = useMemo(() => {
+    const env = getEnvironmentConfig(weather, timeOfDay);
+    if (siegeMode) {
+      return {
+        bgColor: '#1a0e0e',
+        fogColor: '#1a0e0e',
+        fogNear: 60,
+        fogFar: 150,
+      };
+    }
+    return env;
+  }, [weather, timeOfDay, siegeMode]);
+
+  const lightingConfig = useMemo(() => getLightingConfig(weather, timeOfDay), [weather, timeOfDay]);
 
   return (
     <Canvas
@@ -233,15 +229,43 @@ export function Scene3D({ viewMode }: { viewMode: ViewMode }) {
       gl={{ antialias: true, alpha: false }}
       dpr={[1, 2]}
     >
-      <color attach="background" args={[bgColor]} />
-      <fog attach="fog" args={[fogColor, 80, 180]} />
-      
-      <Lighting />
+      <color attach="background" args={[environment.bgColor]} />
+      <fog attach="fog" args={[environment.fogColor, environment.fogNear, environment.fogFar]} />
+
+      {siegeMode ? (
+        <>
+          <ambientLight intensity={0.3} color="#4a2020" />
+          <hemisphereLight args={['#3a2020', '#2a1515', 0.3]} />
+          <directionalLight
+            position={[30, 40, 20]}
+            intensity={0.8}
+            color="#ff6644"
+            castShadow
+            shadow-mapSize-width={2048}
+            shadow-mapSize-height={2048}
+            shadow-camera-far={100}
+            shadow-camera-left={-60}
+            shadow-camera-right={60}
+            shadow-camera-top={60}
+            shadow-camera-bottom={-60}
+            shadow-bias={-0.0001}
+          />
+          <directionalLight position={[-20, 20, -30]} intensity={0.2} color="#884422" />
+        </>
+      ) : (
+        <DynamicLighting weather={weather} timeOfDay={timeOfDay} />
+      )}
+
       <CameraController />
       <SceneContent viewMode={viewMode} />
-      
+
       <EffectComposer>
-        <Bloom luminanceThreshold={0.2} luminanceSmoothing={0.9} height={300} intensity={0.5} />
+        <Bloom
+          luminanceThreshold={0.2}
+          luminanceSmoothing={0.9}
+          height={300}
+          intensity={siegeMode ? 0.8 : lightingConfig.bloomIntensity}
+        />
       </EffectComposer>
     </Canvas>
   );

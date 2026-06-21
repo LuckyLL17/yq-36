@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS } from '@/types/castle';
+import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType } from '@/types/castle';
 import { getInterpolatedStyle } from '@/data/historicalEras';
 
 const baseParams: CastleParams = {
@@ -25,6 +25,8 @@ const baseParams: CastleParams = {
   terrainAmplitude: TERRAIN_PRESETS.plain.amplitude,
   terrainFrequency: TERRAIN_PRESETS.plain.frequency,
   terrainScale: TERRAIN_PRESETS.plain.noiseScale,
+  weather: 'sunny',
+  timeOfDay: 12,
 };
 
 function buildDefaultParams(): CastleParams {
@@ -197,6 +199,14 @@ export const useCastleStore = create<CastleState>((set, get) => ({
         },
       };
     }),
+  applyWeather: (type: WeatherType) =>
+    set((state) => ({
+      params: { ...state.params, weather: type },
+    })),
+  setTimeOfDay: (time: number) =>
+    set((state) => ({
+      params: { ...state.params, timeOfDay: Math.max(0, Math.min(24, time)) },
+    })),
   resetParams: () => set({ params: buildDefaultParams() }),
   randomizeSeed: () =>
     set((state) => ({

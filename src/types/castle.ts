@@ -34,6 +34,30 @@ export const HERALDRY_COLOR_SCHEMES: Record<HeraldryColorScheme, { primary: stri
 export type TowerShape = 'square' | 'round' | 'polygonal' | 'd_shaped';
 export type CrenellationStyle = 'simple' | 'decorated' | 'machicolated' | 'cross_shaped';
 export type TerrainType = 'plain' | 'hills' | 'mountain';
+export type WeatherType = 'sunny' | 'rainy' | 'snowy' | 'foggy';
+
+export const WEATHER_PRESETS: Record<WeatherType, { name: string; icon: string; description: string }> = {
+  sunny: {
+    name: '晴天',
+    icon: '☀️',
+    description: '阳光明媚，天空湛蓝',
+  },
+  rainy: {
+    name: '雨天',
+    icon: '🌧️',
+    description: '细雨绵绵，润物无声',
+  },
+  snowy: {
+    name: '雪天',
+    icon: '❄️',
+    description: '银装素裹，白雪皑皑',
+  },
+  foggy: {
+    name: '雾天',
+    icon: '🌫️',
+    description: '云雾缭绕，如梦如幻',
+  },
+};
 
 export const TERRAIN_PRESETS: Record<TerrainType, { name: string; icon: string; description: string; amplitude: number; frequency: number; noiseScale: number }> = {
   plain: {
@@ -85,6 +109,8 @@ export interface CastleParams {
   terrainAmplitude: number;
   terrainFrequency: number;
   terrainScale: number;
+  weather: WeatherType;
+  timeOfDay: number;
 }
 
 export interface CastleMeshData {
@@ -145,6 +171,8 @@ export interface CastleState {
   setSelectedEraId: (id: string | null) => void;
   applyEraStyle: (year: number) => void;
   applyTerrainType: (type: TerrainType) => void;
+  applyWeather: (type: WeatherType) => void;
+  setTimeOfDay: (time: number) => void;
   resetParams: () => void;
   randomizeSeed: () => void;
   addRoom: (room: Room) => boolean;
