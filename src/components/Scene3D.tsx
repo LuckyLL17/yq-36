@@ -64,30 +64,105 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
     return generator.generatePlotPoints();
   }, [params]);
 
-  const flagPositions = useMemo(() => {
+  const towerInfo = useMemo(() => {
     const style = getInterpolatedStyle(params.eraYear);
     const towerH = params.towerHeight * style.towerHeightMultiplier;
-    return plotPoints.map((point, i) => {
+    const towerR = params.towerRadius * style.towerRadiusMultiplier;
+    const roofHeight = towerR * 1.2;
+
+    const towers: { position: [number, number, number]; rotation: [number, number, number] }[] = [];
+
+    for (let i = 0; i < plotPoints.length; i++) {
+      const point = plotPoints[i];
       const nextPoint = plotPoints[(i + 1) % plotPoints.length];
       const dx = nextPoint.x - point.x;
       const dy = nextPoint.y - point.y;
       const angle = Math.atan2(dy, dx);
-      return {
-        position: [point.x, towerH + 0.5, point.y] as [number, number, number],
-        rotation: [0, -angle + Math.PI / 2, 0] as [number, number, number],
-        key: `flag_${i}`,
-      };
-    });
+
+      const dirX = point.x === 0 ? 0 : (point.x > 0 ? 1 : -1);
+      const dirZ = point.y === 0 ? 0 : (point.y > 0 ? 1 : -1);
+      const len = Math.sqrt(dirX * dirX + dirZ * dirZ) || 1;
+
+      const baseY = towerH + roofHeight;
+      towers.push({
+        position: [
+          point.x + (dirX / len) * towerR * 0.3,
+          baseY,
+          point.y + (dirZ / len) * towerR * 0.3,
+        ],
+        rotation: [0, -angle + Math.PI / 2, 0],
+      });
+    }
+
+    const additionalTowers = Math.max(0, params.towerCount - plotPoints.length);
+    for (let i = 0; i < additionalTowers; i++) {
+      const segIndex = i % plotPoints.length;
+      const p1 = plotPoints[segIndex];
+      const p2 = plotPoints[(segIndex + 1) % plotPoints.length];
+      const t = 0.5;
+      const midX = p1.x + (p2.x - p1.x) * t;
+      const midZ = p1.y + (p2.y - p1.y) * t;
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const angle = Math.atan2(dy, dx);
+
+      const wx = dx;
+      const wz = dy;
+      const n1x = -wz;
+      const n1z = wx;
+      const midVecX = midX;
+      const midVecZ = midZ;
+      const dot = n1x * midVecX + n1z * midVecZ;
+      const outwardX = dot >= 0 ? n1x : -n1x;
+      const outwardZ = dot >= 0 ? n1z : -n1z;
+      const nLen = Math.sqrt(outwardX * outwardX + outwardZ * outwardZ) || 1;
+
+      const h = towerH * 0.9;
+      const r = towerR * 0.9;
+      const rH = r * 1.2;
+
+      towers.push({
+        position: [
+          midX + (outwardX / nLen) * r * 0.3,
+          h + rH,
+          midZ + (outwardZ / nLen) * r * 0.3,
+        ],
+        rotation: [0, -angle + Math.PI / 2, 0],
+      });
+    }
+
+    return towers;
   }, [plotPoints, params]);
 
-  const gateFlagPosition = useMemo(() => {
+  const gateFlagInfo = useMemo(() => {
     const p1 = plotPoints[0];
     const p2 = plotPoints[1];
     const dx = p2.x - p1.x;
     const dy = p2.y - p1.y;
     const angle = Math.atan2(dy, dx);
+    const midX = (p1.x + p2.x) / 2;
+    const midZ = (p1.y + p2.y) / 2;
+
+    const wx = dx;
+    const wz = dy;
+    const n1x = -wz;
+    const n1z = wx;
+    const midVecX = midX;
+    const midVecZ = midZ;
+    const dot = n1x * midVecX + n1z * midVecZ;
+    const outwardX = dot >= 0 ? n1x : -n1x;
+    const outwardZ = dot >= 0 ? n1z : -n1z;
+    const nLen = Math.sqrt(outwardX * outwardX + outwardZ * outwardZ) || 1;
+
+    const gateTopY = params.gateHeight + 2;
+    const offset = params.wallThickness * 0.6 + 0.5;
+
     return {
-      position: [(p1.x + p2.x) / 2, params.gateHeight + 2, (p1.y + p2.y) / 2] as [number, number, number],
+      position: [
+        midX + (outwardX / nLen) * offset,
+        gateTopY + 0.5,
+        midZ + (outwardZ / nLen) * offset,
+      ] as [number, number, number],
       rotation: [0, -angle + Math.PI / 2, 0] as [number, number, number],
     };
   }, [plotPoints, params]);
@@ -96,22 +171,22 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
     <>
       <Castle params={params} viewMode={viewMode} />
       <HeraldryDecoration params={params} />
-      {flagPositions.map((flag) => (
+      {towerInfo.map((info, i) => (
         <Flag3D
-          key={flag.key}
-          position={flag.position}
-          rotation={flag.rotation}
-          poleHeight={5}
-          flagWidth={2.5}
-          flagHeight={1.6}
+          key={`flag_${i}`}
+          position={info.position}
+          rotation={info.rotation}
+          poleHeight={3.5}
+          flagWidth={2.2}
+          flagHeight={1.4}
         />
       ))}
       <Flag3D
-        position={gateFlagPosition.position}
-        rotation={gateFlagPosition.rotation}
-        poleHeight={4}
-        flagWidth={3}
-        flagHeight={2}
+        position={gateFlagInfo.position}
+        rotation={gateFlagInfo.rotation}
+        poleHeight={3}
+        flagWidth={2.8}
+        flagHeight={1.8}
       />
       <SiegeScene viewMode={viewMode} />
       <Grid

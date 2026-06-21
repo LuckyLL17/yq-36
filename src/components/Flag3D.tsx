@@ -64,6 +64,26 @@ interface Flag3DProps {
   flagHeight?: number;
 }
 
+function drawFlagToCanvas(config: ReturnType<typeof useHeraldryStore.getState>['config'], canvas: HTMLCanvasElement) {
+  const ctx = canvas.getContext('2d')!;
+  if (config.applied) {
+    renderHeraldryToCanvas(ctx, canvas.width, canvas.height, config);
+  } else {
+    ctx.fillStyle = '#8B0000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, 'rgba(255,255,255,0.08)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.25)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 96px Cinzel, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⚜', canvas.width / 2, canvas.height / 2);
+  }
+}
+
 export function Flag3D({
   position,
   rotation = [0, 0, 0],
@@ -71,58 +91,38 @@ export function Flag3D({
   flagWidth = 3,
   flagHeight = 2,
 }: Flag3DProps) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const materialRef = useRef<THREE.ShaderMaterial>(null);
   const config = useHeraldryStore((s) => s.config);
+  const materialRef = useRef<THREE.ShaderMaterial>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const textureRef = useRef<THREE.CanvasTexture | null>(null);
 
-  const texture = useMemo(() => {
+  if (!canvasRef.current) {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 512;
-    const ctx = canvas.getContext('2d')!;
-    if (config.applied) {
-      renderHeraldryToCanvas(ctx, 512, 512, config);
-    } else {
-      ctx.fillStyle = '#8B0000';
-      ctx.fillRect(0, 0, 512, 512);
-      ctx.fillStyle = '#FFD700';
-      ctx.font = 'bold 48px Cinzel, serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillText('⚜', 256, 256);
-    }
+    canvasRef.current = canvas;
+    drawFlagToCanvas(config, canvas);
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = THREE.ClampToEdgeWrapping;
     tex.wrapT = THREE.ClampToEdgeWrapping;
+    tex.anisotropy = 8;
     tex.needsUpdate = true;
-    return tex;
-  }, [config]);
+    textureRef.current = tex;
+  }
 
   useEffect(() => {
-    if (meshRef.current) {
-      const canvas = document.createElement('canvas');
-      canvas.width = 512;
-      canvas.height = 512;
-      const ctx = canvas.getContext('2d')!;
-      if (config.applied) {
-        renderHeraldryToCanvas(ctx, 512, 512, config);
-      } else {
-        ctx.fillStyle = '#8B0000';
-        ctx.fillRect(0, 0, 512, 512);
-        ctx.fillStyle = '#FFD700';
-        ctx.font = 'bold 48px Cinzel, serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('⚜', 256, 256);
-      }
-      texture.image = canvas;
-      texture.needsUpdate = true;
+    if (!canvasRef.current || !textureRef.current) return;
+    drawFlagToCanvas(config, canvasRef.current);
+    textureRef.current.needsUpdate = true;
+    if (materialRef.current) {
+      materialRef.current.uniforms.uTexture.value = textureRef.current;
+      materialRef.current.needsUpdate = true;
     }
-  }, [config, texture]);
+  }, [config]);
 
   const flagGeometry = useMemo(() => {
-    const segW = 24;
-    const segH = 16;
+    const segW = 28;
+    const segH = 18;
     const geo = new THREE.PlaneGeometry(flagWidth, flagHeight, segW, segH);
     geo.translate(flagWidth / 2, 0, 0);
     return geo;
@@ -132,17 +132,23 @@ export function Flag3D({
     () => ({
       uTime: { value: 0 },
       uWindStrength: { value: 1.0 },
-      uTexture: { value: texture },
+      uTexture: { value: textureRef.current! },
       uLightDir: { value: new THREE.Vector3(0.5, 0.8, 0.3) },
     }),
-    [texture]
+    []
   );
+
+  useEffect(() => {
+    if (materialRef.current && textureRef.current) {
+      materialRef.current.uniforms.uTexture.value = textureRef.current;
+    }
+  }, []);
 
   useFrame((state) => {
     if (materialRef.current) {
       materialRef.current.uniforms.uTime.value = state.clock.elapsedTime;
       materialRef.current.uniforms.uWindStrength.value =
-        0.8 + Math.sin(state.clock.elapsedTime * 0.3) * 0.2;
+        0.85 + Math.sin(state.clock.elapsedTime * 0.3) * 0.2;
     }
   });
 
@@ -153,23 +159,23 @@ export function Flag3D({
   }, [poleHeight]);
 
   const topGeo = useMemo(() => {
-    const geo = new THREE.SphereGeometry(0.12, 8, 8);
+    const geo = new THREE.SphereGeometry(0.12, 10, 10);
     geo.translate(0, poleHeight + 0.08, 0);
     return geo;
   }, [poleHeight]);
 
   return (
     <group position={position} rotation={rotation}>
-      <mesh geometry={poleGeo}>
-        <meshStandardMaterial color="#5C4033" roughness={0.7} metalness={0.3} />
+      <mesh geometry={poleGeo} castShadow>
+        <meshStandardMaterial color="#5C4033" roughness={0.75} metalness={0.2} />
       </mesh>
-      <mesh geometry={topGeo}>
-        <meshStandardMaterial color="#DAA520" roughness={0.3} metalness={0.8} />
+      <mesh geometry={topGeo} castShadow>
+        <meshStandardMaterial color="#DAA520" roughness={0.35} metalness={0.8} />
       </mesh>
       <mesh
-        ref={meshRef}
         geometry={flagGeometry}
-        position={[0, poleHeight - flagHeight / 2 - 0.3, 0.06]}
+        position={[0, poleHeight - flagHeight / 2 - 0.25, 0.06]}
+        castShadow
       >
         <shaderMaterial
           ref={materialRef}
