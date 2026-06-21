@@ -1,9 +1,9 @@
-import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock } from 'lucide-react';
+import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock, Users } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { CollapsibleSection } from './CollapsibleSection';
 import { SliderControl } from './SliderControl';
 import { ToggleControl } from './ToggleControl';
-import { TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS } from '@/types/castle';
+import { TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, NPC_TYPE_INFO, NPCType } from '@/types/castle';
 
 function formatTime(hours: number): string {
   const h = Math.floor(hours);
@@ -342,6 +342,74 @@ export function ControlPanel() {
             onChange={(v) => setParams({ buildingHeight: v })}
             unit="m"
           />
+        </CollapsibleSection>
+
+        <CollapsibleSection title="居民模式" icon={<Users className="w-4 h-4" />}>
+          <ToggleControl
+            label="启用居民模式"
+            checked={params.residentMode}
+            onChange={(v) => setParams({ residentMode: v })}
+          />
+          {params.residentMode && (
+            <>
+              <SliderControl
+                label="居民数量"
+                value={params.residentCount}
+                min={3}
+                max={50}
+                step={1}
+                onChange={(v) => setParams({ residentCount: v })}
+                unit="人"
+              />
+              <div className="space-y-2 mt-3">
+                <p className="text-xs text-stone-400">居民类型分布</p>
+                <div className="grid grid-cols-3 gap-1.5 mb-2">
+                  {(Object.keys(NPC_TYPE_INFO) as NPCType[]).map((type) => {
+                    const info = NPC_TYPE_INFO[type];
+                    return (
+                      <div
+                        key={type}
+                        className="text-center p-1.5 rounded bg-stone-800/50 border border-stone-700"
+                      >
+                        <div className="text-base">{info.icon}</div>
+                        <div className="text-[10px] text-stone-300">{info.name}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <SliderControl
+                  label="农民比例"
+                  value={params.farmerRatio}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => setParams({ farmerRatio: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                />
+                <SliderControl
+                  label="士兵比例"
+                  value={params.soldierRatio}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => setParams({ soldierRatio: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                />
+                <SliderControl
+                  label="贵族比例"
+                  value={params.nobleRatio}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => setParams({ nobleRatio: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                />
+                <p className="text-[10px] text-stone-500 italic">
+                  提示：不同类型的居民有不同的活动区域和行为特征
+                </p>
+              </div>
+            </>
+          )}
         </CollapsibleSection>
 
         <CollapsibleSection title="随机种子" icon={<Hash className="w-4 h-4" />} defaultOpen={false}>

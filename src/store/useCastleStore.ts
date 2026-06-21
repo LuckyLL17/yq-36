@@ -27,6 +27,11 @@ const baseParams: CastleParams = {
   terrainScale: TERRAIN_PRESETS.plain.noiseScale,
   weather: 'sunny',
   timeOfDay: 12,
+  residentMode: false,
+  residentCount: 12,
+  farmerRatio: 0.5,
+  soldierRatio: 0.3,
+  nobleRatio: 0.2,
 };
 
 function buildDefaultParams(): CastleParams {
@@ -161,6 +166,8 @@ export const useCastleStore = create<CastleState>((set, get) => ({
     corridors: [],
     selectedRoomId: null,
   },
+  selectedNPCId: null,
+  selectedNPCType: null,
   setParams: (newParams) =>
     set((state) => ({
       params: { ...state.params, ...newParams },
@@ -305,5 +312,21 @@ export const useCastleStore = create<CastleState>((set, get) => ({
         corridors: [],
         selectedRoomId: null,
       },
+    })),
+  toggleResidentMode: () =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        residentMode: !state.params.residentMode,
+      },
+    })),
+  setSelectedNPCId: (id) =>
+    set(() => ({
+      selectedNPCId: id,
+    })),
+  selectNPC: (id, type = null) =>
+    set(() => ({
+      selectedNPCId: id,
+      selectedNPCType: type,
     })),
 }));

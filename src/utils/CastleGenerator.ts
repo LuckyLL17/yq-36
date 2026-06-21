@@ -523,8 +523,8 @@ export class CastleGenerator {
     return geometry;
   }
 
-  generateBuildings(plotPoints: THREE.Vector2[]): THREE.BufferGeometry[] {
-    const buildings: THREE.BufferGeometry[] = [];
+  getBuildingPositions(plotPoints: THREE.Vector2[]): { x: number; z: number; width: number; depth: number; height: number }[] {
+    const positions: { x: number; z: number; width: number; depth: number; height: number }[] = [];
     const { buildingCount, buildingHeight } = this.params;
 
     const innerBounds = this.getInnerBounds(plotPoints);
@@ -534,15 +534,16 @@ export class CastleGenerator {
     const maxZ = innerBounds.maxY - 3;
 
     const placed: { x: number; z: number; w: number; d: number }[] = [];
+    const buildingRng = new SeededRandom(this.params.seed + 7777);
 
     for (let i = 0; i < buildingCount; i++) {
       let attempts = 0;
       while (attempts < 20) {
-        const w = 3 + this.rng.range(0, 4);
-        const d = 3 + this.rng.range(0, 4);
-        const x = this.rng.range(minX + w / 2, maxX - w / 2);
-        const z = this.rng.range(minZ + d / 2, maxZ - d / 2);
-        const h = buildingHeight * (0.7 + this.rng.range(0, 0.6));
+        const w = 3 + buildingRng.range(0, 4);
+        const d = 3 + buildingRng.range(0, 4);
+        const x = buildingRng.range(minX + w / 2, maxX - w / 2);
+        const z = buildingRng.range(minZ + d / 2, maxZ - d / 2);
+        const h = buildingHeight * (0.7 + buildingRng.range(0, 0.6));
 
         const overlap = placed.some((p) =>
           Math.abs(p.x - x) < (p.w + w) / 2 + 1 &&
@@ -550,14 +551,25 @@ export class CastleGenerator {
         );
 
         if (!overlap) {
-          const terrainH = this.getTerrainHeight(x, z);
-          const building = this.createBuilding(x, z, w, d, h, terrainH);
-          buildings.push(building);
+          positions.push({ x, z, width: w, depth: d, height: h });
           placed.push({ x, z, w, d });
           break;
         }
         attempts++;
       }
+    }
+
+    return positions;
+  }
+
+  generateBuildings(plotPoints: THREE.Vector2[]): THREE.BufferGeometry[] {
+    const buildings: THREE.BufferGeometry[] = [];
+    const buildingPositions = this.getBuildingPositions(plotPoints);
+
+    for (const pos of buildingPositions) {
+      const terrainH = this.getTerrainHeight(pos.x, pos.z);
+      const building = this.createBuilding(pos.x, pos.z, pos.width, pos.depth, pos.height, terrainH);
+      buildings.push(building);
     }
 
     return buildings;

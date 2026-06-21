@@ -8,6 +8,7 @@ import { Flag3D } from './Flag3D';
 import { HeraldryDecoration } from './HeraldryDecoration';
 import { WeatherParticles } from './WeatherParticles';
 import { DynamicLighting, getEnvironmentConfig, getLightingConfig } from './DynamicLighting';
+import { NPCManager } from './NPCManager';
 import { useCastleStore } from '@/store/useCastleStore';
 import { useSiegeStore } from '@/store/useSiegeStore';
 import { CastleGenerator } from '@/utils/CastleGenerator';
@@ -175,6 +176,7 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
       />
       <SiegeScene viewMode={viewMode} />
       <WeatherParticles weather={params.weather} />
+      <NPCManager params={params} />
       <Grid
         position={[0, -0.5, 0]}
         args={[200, 200]}

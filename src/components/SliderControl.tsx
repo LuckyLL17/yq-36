@@ -6,6 +6,7 @@ interface SliderControlProps {
   step?: number;
   onChange: (value: number) => void;
   unit?: string;
+  format?: (value: number) => string;
 }
 
 export function SliderControl({
@@ -16,14 +17,16 @@ export function SliderControl({
   step = 1,
   onChange,
   unit = '',
+  format,
 }: SliderControlProps) {
+  const displayValue = format ? format(value) : `${value.toFixed(step < 1 ? 1 : 0)}${unit}`;
+
   return (
     <div className="space-y-1.5">
       <div className="flex justify-between items-center text-xs">
         <label className="text-stone-400 font-medium">{label}</label>
         <span className="text-amber-500 font-mono tabular-nums">
-          {value.toFixed(step < 1 ? 1 : 0)}
-          {unit}
+          {displayValue}
         </span>
       </div>
       <div className="relative">

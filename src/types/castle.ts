@@ -35,6 +35,28 @@ export type TowerShape = 'square' | 'round' | 'polygonal' | 'd_shaped';
 export type CrenellationStyle = 'simple' | 'decorated' | 'machicolated' | 'cross_shaped';
 export type TerrainType = 'plain' | 'hills' | 'mountain';
 export type WeatherType = 'sunny' | 'rainy' | 'snowy' | 'foggy';
+export type NPCType = 'farmer' | 'soldier' | 'noble';
+
+export const NPC_TYPE_INFO: Record<NPCType, { name: string; icon: string; description: string; color: string }> = {
+  farmer: {
+    name: '农民',
+    icon: '👨‍🌾',
+    description: '穿布衣，在庭院走动',
+    color: '#8B7355',
+  },
+  soldier: {
+    name: '士兵',
+    icon: '⚔️',
+    description: '穿盔甲，在城墙巡逻',
+    color: '#4A5568',
+  },
+  noble: {
+    name: '贵族',
+    icon: '👑',
+    description: '穿华丽服装，在主建筑附近活动',
+    color: '#9F7AEA',
+  },
+};
 
 export const WEATHER_PRESETS: Record<WeatherType, { name: string; icon: string; description: string }> = {
   sunny: {
@@ -111,6 +133,11 @@ export interface CastleParams {
   terrainScale: number;
   weather: WeatherType;
   timeOfDay: number;
+  residentMode: boolean;
+  residentCount: number;
+  farmerRatio: number;
+  soldierRatio: number;
+  nobleRatio: number;
 }
 
 export interface CastleMeshData {
@@ -165,6 +192,8 @@ export interface CastleState {
   castleGeometries: CastleMeshData | null;
   selectedEraId: string | null;
   interiorLayout: InteriorLayout;
+  selectedNPCId: string | null;
+  selectedNPCType: NPCType | null;
   setParams: (params: Partial<CastleParams>) => void;
   setViewMode: (mode: ViewMode) => void;
   setCastleGeometries: (geometries: CastleMeshData | null) => void;
@@ -181,4 +210,6 @@ export interface CastleState {
   selectRoom: (id: string | null) => void;
   moveRoom: (id: string, x: number, y: number) => boolean;
   clearAllRooms: () => void;
+  toggleResidentMode: () => void;
+  selectNPC: (id: string | null, type?: NPCType | null) => void;
 }
