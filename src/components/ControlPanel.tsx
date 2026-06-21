@@ -1,9 +1,9 @@
-import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock, Users, Layers } from 'lucide-react';
+import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock, Users, Layers, ChevronDown, ChevronUp, Anchor, Waves, TrendingUp } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { CollapsibleSection } from './CollapsibleSection';
 import { SliderControl } from './SliderControl';
 import { ToggleControl } from './ToggleControl';
-import { TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, NPC_TYPE_INFO, NPCType, WallStyle, WALL_STYLE_PRESETS } from '@/types/castle';
+import { TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, NPC_TYPE_INFO, NPCType, WallStyle, WALL_STYLE_PRESETS, TowerType, TOWER_TYPE_INFO, MoatSegment } from '@/types/castle';
 
 function formatTime(hours: number): string {
   const h = Math.floor(hours);
@@ -21,7 +21,19 @@ function getTimeEmoji(hours: number): string {
 }
 
 export function ControlPanel() {
-  const { params, setParams, applyTerrainType, applyWallStyle, applyWeather, setTimeOfDay } = useCastleStore();
+  const {
+    params,
+    setParams,
+    applyTerrainType,
+    applyWallStyle,
+    applyWeather,
+    setTimeOfDay,
+    applyTowerType,
+    updateTowerSpecificParams,
+    setDrawbridgeAngle,
+    setPortcullisPosition,
+    updateMoatSegment,
+  } = useCastleStore();
 
   return (
     <div className="w-80 bg-stone-900/95 backdrop-blur-sm border-r border-amber-900/30 flex flex-col h-full">
@@ -273,7 +285,37 @@ export function ControlPanel() {
           />
         </CollapsibleSection>
 
-        <CollapsibleSection title="塔楼设置" icon={<Castle className="w-4 h-4" />}>
+        <CollapsibleSection title="塔楼设置" icon={<Castle className="w-4 h-4" />} defaultOpen>
+          <div className="space-y-2 mb-3">
+            <p className="text-xs text-stone-400">选择塔楼类型</p>
+            <div className="grid grid-cols-5 gap-1.5">
+              {(Object.keys(TOWER_TYPE_INFO) as TowerType[]).map((type) => {
+                const info = TOWER_TYPE_INFO[type];
+                const isSelected = params.towerType === type;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => applyTowerType(type)}
+                    className={`p-1.5 rounded-lg border transition-all text-center ${
+                      isSelected
+                        ? 'bg-purple-600/30 border-purple-500 ring-1 ring-purple-500'
+                        : 'bg-stone-800/50 border-stone-700 hover:bg-stone-700/50 hover:border-stone-600'
+                    }`}
+                    title={info.description}
+                  >
+                    <div className="text-base mb-0.5">{info.icon}</div>
+                    <div className={`text-[9px] font-medium leading-tight ${isSelected ? 'text-purple-300' : 'text-stone-300'}`}>
+                      {info.name}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-stone-500 italic">
+              {TOWER_TYPE_INFO[params.towerType].description}
+            </p>
+          </div>
+
           <SliderControl
             label="塔楼数量"
             value={params.towerCount}
@@ -301,6 +343,138 @@ export function ControlPanel() {
             onChange={(v) => setParams({ towerRadius: v })}
             unit="m"
           />
+
+          {params.towerType === 'square_fort' && (
+            <div className="mt-3 p-2 bg-purple-900/20 rounded-lg border border-purple-800/30">
+              <p className="text-xs text-purple-300 font-medium mb-2">方形堡垒参数</p>
+              <SliderControl
+                label="城垛高度"
+                value={params.towerSpecificParams.squareFort.crenellationHeight}
+                min={0.5}
+                max={3}
+                step={0.1}
+                onChange={(v) => updateTowerSpecificParams('squareFort', { crenellationHeight: v })}
+                unit="m"
+              />
+              <SliderControl
+                label="扶壁数量"
+                value={params.towerSpecificParams.squareFort.buttressCount}
+                min={0}
+                max={8}
+                step={1}
+                onChange={(v) => updateTowerSpecificParams('squareFort', { buttressCount: v })}
+                unit="个"
+              />
+              <SliderControl
+                label="窗户排数"
+                value={params.towerSpecificParams.squareFort.windowRows}
+                min={1}
+                max={6}
+                step={1}
+                onChange={(v) => updateTowerSpecificParams('squareFort', { windowRows: v })}
+                unit="排"
+              />
+            </div>
+          )}
+
+          {params.towerType === 'polygon_tower' && (
+            <div className="mt-3 p-2 bg-purple-900/20 rounded-lg border border-purple-800/30">
+              <p className="text-xs text-purple-300 font-medium mb-2">多边形塔楼参数</p>
+              <SliderControl
+                label="边数"
+                value={params.towerSpecificParams.polygonTower.sides}
+                min={5}
+                max={12}
+                step={1}
+                onChange={(v) => updateTowerSpecificParams('polygonTower', { sides: v })}
+                unit="边"
+              />
+              <SliderControl
+                label="小尖塔数"
+                value={params.towerSpecificParams.polygonTower.pinnacleCount}
+                min={0}
+                max={12}
+                step={1}
+                onChange={(v) => updateTowerSpecificParams('polygonTower', { pinnacleCount: v })}
+                unit="座"
+              />
+              <SliderControl
+                label="角楼高度"
+                value={params.towerSpecificParams.polygonTower.turretHeight}
+                min={0.5}
+                max={5}
+                step={0.5}
+                onChange={(v) => updateTowerSpecificParams('polygonTower', { turretHeight: v })}
+                unit="m"
+              />
+            </div>
+          )}
+
+          {params.towerType === 'spiral_stair' && (
+            <div className="mt-3 p-2 bg-purple-900/20 rounded-lg border border-purple-800/30">
+              <p className="text-xs text-purple-300 font-medium mb-2">螺旋楼梯塔参数</p>
+              <SliderControl
+                label="楼梯宽度"
+                value={params.towerSpecificParams.spiralStair.stairWidth}
+                min={0.5}
+                max={2.5}
+                step={0.1}
+                onChange={(v) => updateTowerSpecificParams('spiralStair', { stairWidth: v })}
+                unit="m"
+              />
+              <SliderControl
+                label="螺旋圈数"
+                value={params.towerSpecificParams.spiralStair.stairTurns}
+                min={2}
+                max={8}
+                step={1}
+                onChange={(v) => updateTowerSpecificParams('spiralStair', { stairTurns: v })}
+                unit="圈"
+              />
+              <SliderControl
+                label="中心柱半径"
+                value={params.towerSpecificParams.spiralStair.centralColumnRadius}
+                min={0.3}
+                max={1.5}
+                step={0.1}
+                onChange={(v) => updateTowerSpecificParams('spiralStair', { centralColumnRadius: v })}
+                unit="m"
+              />
+            </div>
+          )}
+
+          {params.towerType === 'gatehouse' && (
+            <div className="mt-3 p-2 bg-purple-900/20 rounded-lg border border-purple-800/30">
+              <p className="text-xs text-purple-300 font-medium mb-2">门楼式塔楼参数</p>
+              <SliderControl
+                label="拱门宽度"
+                value={params.towerSpecificParams.gatehouse.archWidth}
+                min={3}
+                max={10}
+                step={0.5}
+                onChange={(v) => updateTowerSpecificParams('gatehouse', { archWidth: v })}
+                unit="m"
+              />
+              <SliderControl
+                label="拱门高度"
+                value={params.towerSpecificParams.gatehouse.archHeight}
+                min={3}
+                max={10}
+                step={0.5}
+                onChange={(v) => updateTowerSpecificParams('gatehouse', { archHeight: v })}
+                unit="m"
+              />
+              <SliderControl
+                label="双塔间距"
+                value={params.towerSpecificParams.gatehouse.towerSpacing}
+                min={5}
+                max={15}
+                step={0.5}
+                onChange={(v) => updateTowerSpecificParams('gatehouse', { towerSpacing: v })}
+                unit="m"
+              />
+            </div>
+          )}
         </CollapsibleSection>
 
         <CollapsibleSection title="城门设置" icon={<DoorOpen className="w-4 h-4" />}>
@@ -324,7 +498,7 @@ export function ControlPanel() {
           />
         </CollapsibleSection>
 
-        <CollapsibleSection title="护城河" icon={<Droplets className="w-4 h-4" />}>
+        <CollapsibleSection title="护城河系统" icon={<Droplets className="w-4 h-4" />} defaultOpen>
           <ToggleControl
             label="启用护城河"
             checked={params.hasMoat}
@@ -350,6 +524,211 @@ export function ControlPanel() {
                 onChange={(v) => setParams({ moatDepth: v })}
                 unit="m"
               />
+
+              <div className="mt-3 p-2 bg-sky-900/20 rounded-lg border border-sky-800/30">
+                <p className="text-xs text-sky-300 font-medium mb-2 flex items-center gap-1.5">
+                  <Waves className="w-3.5 h-3.5" />
+                  水位设置
+                </p>
+                <SliderControl
+                  label="全局水位"
+                  value={params.moatWaterParams.globalWaterLevel}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => setParams({ moatWaterParams: { ...params.moatWaterParams, globalWaterLevel: v } })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                />
+                <SliderControl
+                  label="波浪高度"
+                  value={params.moatWaterParams.waveHeight}
+                  min={0}
+                  max={0.5}
+                  step={0.02}
+                  onChange={(v) => setParams({ moatWaterParams: { ...params.moatWaterParams, waveHeight: v } })}
+                  unit="m"
+                />
+                <SliderControl
+                  label="水流速度"
+                  value={params.moatWaterParams.flowSpeed}
+                  min={0}
+                  max={3}
+                  step={0.1}
+                  onChange={(v) => setParams({ moatWaterParams: { ...params.moatWaterParams, flowSpeed: v } })}
+                />
+                <ToggleControl
+                  label="启用水面动画"
+                  checked={params.moatWaterParams.isAnimated}
+                  onChange={(v) => setParams({ moatWaterParams: { ...params.moatWaterParams, isAnimated: v } })}
+                />
+              </div>
+
+              <div className="mt-3 p-2 bg-amber-900/20 rounded-lg border border-amber-800/30">
+                <p className="text-xs text-amber-300 font-medium mb-2 flex items-center gap-1.5">
+                  <Anchor className="w-3.5 h-3.5" />
+                  塔桥控制
+                </p>
+                <ToggleControl
+                  label="启用塔桥"
+                  checked={params.hasDrawbridge}
+                  onChange={(v) => setParams({ hasDrawbridge: v })}
+                />
+                {params.hasDrawbridge && (
+                  <div className="mt-2">
+                    <div className="flex justify-between items-center text-xs mb-1">
+                      <label className="text-stone-300">抬起角度</label>
+                      <span className="text-amber-400 font-mono">{Math.round(params.drawbridgeAngle)}°</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={90}
+                      step={1}
+                      value={params.drawbridgeAngle}
+                      onChange={(e) => setDrawbridgeAngle(parseFloat(e.target.value))}
+                      className="w-full h-2 rounded-full appearance-none cursor-pointer
+                        [&::-webkit-slider-thumb]:appearance-none
+                        [&::-webkit-slider-thumb]:w-4
+                        [&::-webkit-slider-thumb]:h-4
+                        [&::-webkit-slider-thumb]:rounded-full
+                        [&::-webkit-slider-thumb]:bg-amber-500
+                        [&::-webkit-slider-thumb]:cursor-pointer"
+                      style={{
+                        background: `linear-gradient(to right, #92400e 0%, #f59e0b ${params.drawbridgeAngle / 90 * 100}%, #78716c ${params.drawbridgeAngle / 90 * 100}%, #57534e 100%)`,
+                      }}
+                    />
+                    <div className="grid grid-cols-2 gap-1.5 mt-2">
+                      <button
+                        onClick={() => setDrawbridgeAngle(0)}
+                        className="px-2 py-1 bg-stone-700/50 hover:bg-stone-600/50 border border-stone-600 rounded text-[10px] text-stone-200 transition-colors"
+                      >
+                        ▼ 放下 (0°)
+                      </button>
+                      <button
+                        onClick={() => setDrawbridgeAngle(75)}
+                        className="px-2 py-1 bg-stone-700/50 hover:bg-stone-600/50 border border-stone-600 rounded text-[10px] text-stone-200 transition-colors"
+                      >
+                        ▲ 抬起 (75°)
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-3 p-2 bg-red-900/20 rounded-lg border border-red-800/30">
+                <p className="text-xs text-red-300 font-medium mb-2 flex items-center gap-1.5">
+                  <TrendingUp className="w-3.5 h-3.5" />
+                  铁闸门控制
+                </p>
+                <ToggleControl
+                  label="启用铁闸门"
+                  checked={params.hasPortcullis}
+                  onChange={(v) => setParams({ hasPortcullis: v })}
+                />
+                {params.hasPortcullis && (
+                  <div className="mt-2">
+                    <div className="flex justify-between items-center text-xs mb-1">
+                      <label className="text-stone-300">升起高度</label>
+                      <span className="text-red-400 font-mono">{Math.round(params.portcullisPosition * 100)}%</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.02}
+                      value={params.portcullisPosition}
+                      onChange={(e) => setPortcullisPosition(parseFloat(e.target.value))}
+                      className="w-full h-2 rounded-full appearance-none cursor-pointer
+                        [&::-webkit-slider-thumb]:appearance-none
+                        [&::-webkit-slider-thumb]:w-4
+                        [&::-webkit-slider-thumb]:h-4
+                        [&::-webkit-slider-thumb]:rounded-full
+                        [&::-webkit-slider-thumb]:bg-red-500
+                        [&::-webkit-slider-thumb]:cursor-pointer"
+                      style={{
+                        background: `linear-gradient(to right, #7f1d1d 0%, #ef4444 ${params.portcullisPosition * 100}%, #78716c ${params.portcullisPosition * 100}%, #57534e 100%)`,
+                      }}
+                    />
+                    <div className="grid grid-cols-2 gap-1.5 mt-2">
+                      <button
+                        onClick={() => setPortcullisPosition(0)}
+                        className="px-2 py-1 bg-stone-700/50 hover:bg-stone-600/50 border border-stone-600 rounded text-[10px] text-stone-200 transition-colors"
+                      >
+                        ⬇ 关闭
+                      </button>
+                      <button
+                        onClick={() => setPortcullisPosition(1)}
+                        className="px-2 py-1 bg-stone-700/50 hover:bg-stone-600/50 border border-stone-600 rounded text-[10px] text-stone-200 transition-colors"
+                      >
+                        ⬆ 开启
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-3 p-2 bg-teal-900/20 rounded-lg border border-teal-800/30">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs text-teal-300 font-medium flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5" />
+                    分段水位控制
+                  </p>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {params.moatSegments.map((seg: MoatSegment, idx: number) => (
+                    <div key={seg.id} className="p-2 bg-stone-800/60 rounded border border-stone-700/50">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[11px] text-teal-400 font-medium">
+                          分段 {idx + 1} (边 {seg.startIndex}-{seg.endIndex})
+                        </span>
+                        <div className="flex gap-1">
+                          <span className="text-[9px] px-1.5 py-0.5 bg-sky-800/40 text-sky-300 rounded">
+                            {seg.hasDrawbridge ? '塔桥' : ''}
+                          </span>
+                          <span className="text-[9px] px-1.5 py-0.5 bg-red-800/40 text-red-300 rounded">
+                            {seg.hasPortcullis ? '闸门' : ''}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-stone-400 w-8">水位</span>
+                          <input
+                            type="range"
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            value={seg.waterLevel}
+                            onChange={(e) => updateMoatSegment(seg.id, { waterLevel: parseFloat(e.target.value) })}
+                            className="flex-1 h-1.5 rounded-full appearance-none cursor-pointer
+                              [&::-webkit-slider-thumb]:appearance-none
+                              [&::-webkit-slider-thumb]:w-3
+                              [&::-webkit-slider-thumb]:h-3
+                              [&::-webkit-slider-thumb]:rounded-full
+                              [&::-webkit-slider-thumb]:bg-teal-500
+                              [&::-webkit-slider-thumb]:cursor-pointer"
+                          />
+                          <span className="text-[10px] text-teal-400 w-8 text-right font-mono">
+                            {Math.round(seg.waterLevel * 100)}%
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <ToggleControl
+                            label="有塔桥"
+                            checked={seg.hasDrawbridge}
+                            onChange={(v) => updateMoatSegment(seg.id, { hasDrawbridge: v })}
+                          />
+                          <ToggleControl
+                            label="有闸门"
+                            checked={seg.hasPortcullis}
+                            onChange={(v) => updateMoatSegment(seg.id, { hasPortcullis: v })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </>
           )}
         </CollapsibleSection>

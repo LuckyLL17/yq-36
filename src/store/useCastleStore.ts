@@ -1,6 +1,15 @@
 import { create } from 'zustand';
-import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WallStyle, WALL_STYLE_PRESETS } from '@/types/castle';
+import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WallStyle, WALL_STYLE_PRESETS, TowerType, DEFAULT_TOWER_PARAMS, DEFAULT_MOAT_WATER_PARAMS, MoatSegment, TowerSpecificParams } from '@/types/castle';
 import { getInterpolatedStyle } from '@/data/historicalEras';
+
+function generateDefaultMoatSegments(): MoatSegment[] {
+  return [
+    { id: 'seg_1', startIndex: 0, endIndex: 1, waterLevel: 0.8, hasDrawbridge: true, drawbridgeAngle: 0, hasPortcullis: true, portcullisHeight: 0 },
+    { id: 'seg_2', startIndex: 1, endIndex: 2, waterLevel: 0.8, hasDrawbridge: false, drawbridgeAngle: 0, hasPortcullis: false, portcullisHeight: 0 },
+    { id: 'seg_3', startIndex: 2, endIndex: 3, waterLevel: 0.8, hasDrawbridge: false, drawbridgeAngle: 0, hasPortcullis: false, portcullisHeight: 0 },
+    { id: 'seg_4', startIndex: 3, endIndex: 0, waterLevel: 0.8, hasDrawbridge: false, drawbridgeAngle: 0, hasPortcullis: false, portcullisHeight: 0 },
+  ];
+}
 
 const baseParams: CastleParams = {
   plotWidth: 40,
@@ -20,6 +29,8 @@ const baseParams: CastleParams = {
   seed: 12345,
   eraYear: 1200,
   towerShape: 'round',
+  towerType: 'basic',
+  towerSpecificParams: { ...DEFAULT_TOWER_PARAMS },
   crenellationStyle: 'decorated',
   wallStyle: 'medieval',
   terrainType: 'plain',
@@ -33,6 +44,12 @@ const baseParams: CastleParams = {
   farmerRatio: 0.5,
   soldierRatio: 0.3,
   nobleRatio: 0.2,
+  moatSegments: generateDefaultMoatSegments(),
+  moatWaterParams: { ...DEFAULT_MOAT_WATER_PARAMS },
+  hasPortcullis: true,
+  portcullisPosition: 0,
+  drawbridgeAngle: 0,
+  hasDrawbridge: true,
 };
 
 function buildDefaultParams(): CastleParams {
@@ -47,6 +64,9 @@ function buildDefaultParams(): CastleParams {
     buildingCount: Math.round(baseParams.buildingCount * style.buildingCountMultiplier),
     towerShape: style.towerShape,
     crenellationStyle: style.crenellationStyle,
+    towerSpecificParams: { ...DEFAULT_TOWER_PARAMS },
+    moatSegments: generateDefaultMoatSegments(),
+    moatWaterParams: { ...DEFAULT_MOAT_WATER_PARAMS },
   };
 }
 
@@ -341,5 +361,71 @@ export const useCastleStore = create<CastleState>((set, get) => ({
     set(() => ({
       selectedNPCId: id,
       selectedNPCType: type,
+    })),
+  applyTowerType: (type: TowerType) =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        towerType: type,
+      },
+    })),
+  updateTowerSpecificParams: (type: keyof TowerSpecificParams, updates: Partial<TowerSpecificParams[keyof TowerSpecificParams]>) =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        towerSpecificParams: {
+          ...state.params.towerSpecificParams,
+          [type]: {
+            ...state.params.towerSpecificParams[type],
+            ...updates,
+          },
+        },
+      },
+    })),
+  setDrawbridgeAngle: (angle: number) =>
+    set((state) => {
+      const newSegments = state.params.moatSegments.map((seg) =>
+        seg.hasDrawbridge ? { ...seg, drawbridgeAngle: angle } : seg
+      );
+      return {
+        params: {
+          ...state.params,
+          drawbridgeAngle: angle,
+          moatSegments: newSegments,
+        },
+      };
+    }),
+  setPortcullisPosition: (position: number) =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        portcullisPosition: position,
+      },
+    })),
+  updateMoatSegment: (segmentId: string, updates: Partial<MoatSegment>) =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        moatSegments: state.params.moatSegments.map((seg) =>
+          seg.id === segmentId ? { ...seg, ...updates } : seg
+        ),
+      },
+    })),
+  addMoatSegment: (segment: Omit<MoatSegment, 'id'>) =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        moatSegments: [
+          ...state.params.moatSegments,
+          { ...segment, id: `seg_${Date.now()}` },
+        ],
+      },
+    })),
+  removeMoatSegment: (segmentId: string) =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        moatSegments: state.params.moatSegments.filter((seg) => seg.id !== segmentId),
+      },
     })),
 }));

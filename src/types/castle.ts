@@ -32,11 +32,113 @@ export const HERALDRY_COLOR_SCHEMES: Record<HeraldryColorScheme, { primary: stri
 };
 
 export type TowerShape = 'square' | 'round' | 'polygonal' | 'd_shaped';
+export type TowerType = 'basic' | 'square_fort' | 'polygon_tower' | 'spiral_stair' | 'gatehouse';
 export type CrenellationStyle = 'simple' | 'decorated' | 'machicolated' | 'cross_shaped';
 export type WallStyle = 'medieval' | 'roman' | 'norman' | 'gothic' | 'crusader' | 'renaissance';
 export type TerrainType = 'plain' | 'hills' | 'mountain';
 export type WeatherType = 'sunny' | 'rainy' | 'snowy' | 'foggy';
 export type NPCType = 'farmer' | 'soldier' | 'noble';
+
+export const TOWER_TYPE_INFO: Record<TowerType, { name: string; icon: string; description: string }> = {
+  basic: {
+    name: '基础塔楼',
+    icon: '🗼',
+    description: '根据城墙风格自动选择塔楼形状',
+  },
+  square_fort: {
+    name: '方形堡垒',
+    icon: '🏯',
+    description: '坚固的方形塔楼，厚重城垛，适合防御',
+  },
+  polygon_tower: {
+    name: '多边形塔楼',
+    icon: '⬡',
+    description: '六边形或八边形塔楼，视野广阔，装饰华丽',
+  },
+  spiral_stair: {
+    name: '螺旋楼梯塔',
+    icon: '🌀',
+    description: '外部带螺旋楼梯的独特塔楼',
+  },
+  gatehouse: {
+    name: '门楼式塔楼',
+    icon: '🚪',
+    description: '集成拱门通道的门楼塔楼，威严庄重',
+  },
+};
+
+export interface TowerSpecificParams {
+  squareFort: {
+    crenellationHeight: number;
+    buttressCount: number;
+    windowRows: number;
+  };
+  polygonTower: {
+    sides: number;
+    pinnacleCount: number;
+    turretHeight: number;
+  };
+  spiralStair: {
+    stairWidth: number;
+    stairTurns: number;
+    centralColumnRadius: number;
+  };
+  gatehouse: {
+    archWidth: number;
+    archHeight: number;
+    towerSpacing: number;
+    portcullisHeight: number;
+  };
+}
+
+export interface MoatSegment {
+  id: string;
+  startIndex: number;
+  endIndex: number;
+  waterLevel: number;
+  hasDrawbridge: boolean;
+  drawbridgeAngle: number;
+  hasPortcullis: boolean;
+  portcullisHeight: number;
+}
+
+export const DEFAULT_TOWER_PARAMS: TowerSpecificParams = {
+  squareFort: {
+    crenellationHeight: 1.5,
+    buttressCount: 4,
+    windowRows: 3,
+  },
+  polygonTower: {
+    sides: 8,
+    pinnacleCount: 8,
+    turretHeight: 2,
+  },
+  spiralStair: {
+    stairWidth: 1.2,
+    stairTurns: 4,
+    centralColumnRadius: 0.8,
+  },
+  gatehouse: {
+    archWidth: 5,
+    archHeight: 6,
+    towerSpacing: 8,
+    portcullisHeight: 5,
+  },
+};
+
+export interface MoatWaterParams {
+  globalWaterLevel: number;
+  waveHeight: number;
+  flowSpeed: number;
+  isAnimated: boolean;
+}
+
+export const DEFAULT_MOAT_WATER_PARAMS: MoatWaterParams = {
+  globalWaterLevel: 0.8,
+  waveHeight: 0.1,
+  flowSpeed: 1,
+  isAnimated: true,
+};
 
 export const NPC_TYPE_INFO: Record<NPCType, { name: string; icon: string; description: string; color: string }> = {
   farmer: {
@@ -213,6 +315,8 @@ export interface CastleParams {
   seed: number;
   eraYear: number;
   towerShape: TowerShape;
+  towerType: TowerType;
+  towerSpecificParams: TowerSpecificParams;
   crenellationStyle: CrenellationStyle;
   wallStyle: WallStyle;
   terrainType: TerrainType;
@@ -226,6 +330,12 @@ export interface CastleParams {
   farmerRatio: number;
   soldierRatio: number;
   nobleRatio: number;
+  moatSegments: MoatSegment[];
+  moatWaterParams: MoatWaterParams;
+  hasPortcullis: boolean;
+  portcullisPosition: number;
+  drawbridgeAngle: number;
+  hasDrawbridge: boolean;
 }
 
 export interface CastleMeshData {
@@ -233,6 +343,11 @@ export interface CastleMeshData {
   towers: THREE.BufferGeometry[];
   gate: THREE.BufferGeometry;
   moat: THREE.BufferGeometry | null;
+  moatSegments: THREE.BufferGeometry[];
+  water: THREE.BufferGeometry | null;
+  waterSegments: THREE.BufferGeometry[];
+  drawbridge: THREE.BufferGeometry | null;
+  portcullis: THREE.BufferGeometry | null;
   buildings: THREE.BufferGeometry[];
   ground: THREE.BufferGeometry;
 }
@@ -301,4 +416,11 @@ export interface CastleState {
   clearAllRooms: () => void;
   toggleResidentMode: () => void;
   selectNPC: (id: string | null, type?: NPCType | null) => void;
+  applyTowerType: (type: TowerType) => void;
+  updateTowerSpecificParams: (type: keyof TowerSpecificParams, updates: Partial<TowerSpecificParams[keyof TowerSpecificParams]>) => void;
+  setDrawbridgeAngle: (angle: number) => void;
+  setPortcullisPosition: (position: number) => void;
+  updateMoatSegment: (segmentId: string, updates: Partial<MoatSegment>) => void;
+  addMoatSegment: (segment: Omit<MoatSegment, 'id'>) => void;
+  removeMoatSegment: (segmentId: string) => void;
 }
