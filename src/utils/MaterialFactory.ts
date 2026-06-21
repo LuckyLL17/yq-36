@@ -1,20 +1,28 @@
 import * as THREE from 'three';
+import { WallStyle, WALL_STYLE_PRESETS } from '@/types/castle';
 
 export class MaterialFactory {
-  private static stoneTexture: THREE.CanvasTexture | null = null;
+  private static stoneTextures: Map<WallStyle, THREE.CanvasTexture> = new Map();
   private static woodTexture: THREE.CanvasTexture | null = null;
   private static waterTexture: THREE.CanvasTexture | null = null;
   private static roofTexture: THREE.CanvasTexture | null = null;
   private static checkerboardTexture: THREE.Texture | null = null;
 
-  static getStoneMaterial(wireframe: boolean = false): THREE.MeshStandardMaterial {
-    if (!this.stoneTexture) {
-      this.stoneTexture = this.createStoneTexture();
+  static getStoneMaterial(wireframe: boolean = false, style: WallStyle = 'medieval'): THREE.MeshStandardMaterial {
+    if (!this.stoneTextures.has(style)) {
+      const preset = WALL_STYLE_PRESETS[style];
+      this.stoneTextures.set(style, this.createStoneTexture(
+        preset.stoneColorLight,
+        preset.stoneColorDark,
+        preset.mortarColor,
+        style
+      ));
     }
+    const preset = WALL_STYLE_PRESETS[style];
     return new THREE.MeshStandardMaterial({
-      map: this.stoneTexture,
-      color: 0x8b7355,
-      roughness: 0.85,
+      map: this.stoneTextures.get(style)!,
+      color: new THREE.Color(preset.stoneColor),
+      roughness: preset.roughness,
       metalness: 0.05,
       wireframe,
     });
@@ -94,38 +102,89 @@ export class MaterialFactory {
     });
   }
 
-  private static createStoneTexture(): THREE.CanvasTexture {
+  private static createStoneTexture(
+    lightColor: string,
+    darkColor: string,
+    mortarColor: string,
+    style: WallStyle
+  ): THREE.CanvasTexture {
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 512;
     const ctx = canvas.getContext('2d')!;
 
     const gradient = ctx.createLinearGradient(0, 0, 0, 512);
-    gradient.addColorStop(0, '#9a8b7a');
-    gradient.addColorStop(1, '#6b5b4f');
+    gradient.addColorStop(0, lightColor);
+    gradient.addColorStop(1, darkColor);
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, 512, 512);
 
-    for (let i = 0; i < 2000; i++) {
+    const speckCount = style === 'roman' || style === 'renaissance' ? 1000 : 2000;
+    for (let i = 0; i < speckCount; i++) {
       const x = Math.random() * 512;
       const y = Math.random() * 512;
       const size = Math.random() * 3 + 1;
       const alpha = Math.random() * 0.3;
-      ctx.fillStyle = `rgba(50, 40, 30, ${alpha})`;
+      ctx.fillStyle = `rgba(30, 20, 10, ${alpha})`;
       ctx.beginPath();
       ctx.arc(x, y, size, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    for (let y = 0; y < 512; y += 64) {
-      ctx.strokeStyle = 'rgba(40, 30, 20, 0.4)';
-      ctx.lineWidth = 2;
+    const mortarR = parseInt(mortarColor.slice(1, 3), 16);
+    const mortarG = parseInt(mortarColor.slice(3, 5), 16);
+    const mortarB = parseInt(mortarColor.slice(5, 7), 16);
+
+    const stoneHeight = style === 'roman' ? 48 : style === 'gothic' ? 56 : 64;
+    const stoneWidth = style === 'roman' ? 96 : style === 'gothic' ? 72 : 64;
+
+    for (let y = 0; y < 512; y += stoneHeight) {
+      ctx.strokeStyle = `rgba(${mortarR}, ${mortarG}, ${mortarB}, 0.5)`;
+      ctx.lineWidth = 3;
       ctx.beginPath();
       ctx.moveTo(0, y);
       for (let x = 0; x <= 512; x += 32) {
-        ctx.lineTo(x, y + (Math.random() - 0.5) * 4);
+        ctx.lineTo(x, y + (Math.random() - 0.5) * 3);
       }
       ctx.stroke();
+    }
+
+    let row = 0;
+    for (let y = 0; y < 512; y += stoneHeight) {
+      const offset = row % 2 === 0 ? 0 : stoneWidth / 2;
+      for (let x = -stoneWidth + offset; x < 512 + stoneWidth; x += stoneWidth) {
+        ctx.strokeStyle = `rgba(${mortarR}, ${mortarG}, ${mortarB}, 0.4)`;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + (Math.random() - 0.5) * 2, y + stoneHeight);
+        ctx.stroke();
+      }
+      row++;
+    }
+
+    if (style === 'gothic') {
+      for (let i = 0; i < 8; i++) {
+        const cx = 32 + Math.random() * 448;
+        const cy = 32 + Math.random() * 448;
+        ctx.fillStyle = `rgba(${mortarR}, ${mortarG}, ${mortarB}, 0.15)`;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 12 + Math.random() * 8, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    if (style === 'roman') {
+      ctx.strokeStyle = `rgba(${mortarR}, ${mortarG}, ${mortarB}, 0.3)`;
+      ctx.lineWidth = 1;
+      for (let y = 0; y < 512; y += stoneHeight) {
+        for (let x = 0; x < 512; x += stoneWidth / 2) {
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x, y + stoneHeight);
+          ctx.stroke();
+        }
+      }
     }
 
     const texture = new THREE.CanvasTexture(canvas);

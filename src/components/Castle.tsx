@@ -77,7 +77,7 @@ export function Castle({ params, viewMode }: CastleProps) {
     }
     switch (type) {
       case 'stone':
-        return MaterialFactory.getStoneMaterial();
+        return MaterialFactory.getStoneMaterial(false, params.wallStyle);
       case 'wood':
         return MaterialFactory.getWoodMaterial();
       case 'roof':

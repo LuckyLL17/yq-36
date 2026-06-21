@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType } from '@/types/castle';
+import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WallStyle, WALL_STYLE_PRESETS } from '@/types/castle';
 import { getInterpolatedStyle } from '@/data/historicalEras';
 
 const baseParams: CastleParams = {
@@ -21,6 +21,7 @@ const baseParams: CastleParams = {
   eraYear: 1200,
   towerShape: 'round',
   crenellationStyle: 'decorated',
+  wallStyle: 'medieval',
   terrainType: 'plain',
   terrainAmplitude: TERRAIN_PRESETS.plain.amplitude,
   terrainFrequency: TERRAIN_PRESETS.plain.frequency,
@@ -203,6 +204,18 @@ export const useCastleStore = create<CastleState>((set, get) => ({
           terrainAmplitude: preset.amplitude,
           terrainFrequency: preset.frequency,
           terrainScale: preset.noiseScale,
+        },
+      };
+    }),
+  applyWallStyle: (style: WallStyle) =>
+    set((state) => {
+      const preset = WALL_STYLE_PRESETS[style];
+      return {
+        params: {
+          ...state.params,
+          wallStyle: style,
+          crenellationStyle: preset.crenellationStyle,
+          towerShape: preset.towerShape,
         },
       };
     }),

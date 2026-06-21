@@ -1,9 +1,9 @@
-import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock, Users } from 'lucide-react';
+import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock, Users, Layers } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { CollapsibleSection } from './CollapsibleSection';
 import { SliderControl } from './SliderControl';
 import { ToggleControl } from './ToggleControl';
-import { TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, NPC_TYPE_INFO, NPCType } from '@/types/castle';
+import { TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, NPC_TYPE_INFO, NPCType, WallStyle, WALL_STYLE_PRESETS } from '@/types/castle';
 
 function formatTime(hours: number): string {
   const h = Math.floor(hours);
@@ -21,7 +21,7 @@ function getTimeEmoji(hours: number): string {
 }
 
 export function ControlPanel() {
-  const { params, setParams, applyTerrainType, applyWeather, setTimeOfDay } = useCastleStore();
+  const { params, setParams, applyTerrainType, applyWallStyle, applyWeather, setTimeOfDay } = useCastleStore();
 
   return (
     <div className="w-80 bg-stone-900/95 backdrop-blur-sm border-r border-amber-900/30 flex flex-col h-full">
@@ -197,6 +197,37 @@ export function ControlPanel() {
                 <div className="text-[10px]">{preset.label}</div>
               </button>
             ))}
+          </div>
+        </CollapsibleSection>
+
+        <CollapsibleSection title="城墙风格" icon={<Layers className="w-4 h-4" />}>
+          <div className="space-y-2 mb-3">
+            <p className="text-xs text-stone-400">选择城墙建筑风格</p>
+            <div className="grid grid-cols-3 gap-2">
+              {(Object.keys(WALL_STYLE_PRESETS) as WallStyle[]).map((style) => {
+                const preset = WALL_STYLE_PRESETS[style];
+                const isSelected = params.wallStyle === style;
+                return (
+                  <button
+                    key={style}
+                    onClick={() => applyWallStyle(style)}
+                    className={`p-2 rounded-lg border transition-all text-center ${
+                      isSelected
+                        ? 'bg-amber-600/30 border-amber-500 ring-1 ring-amber-500'
+                        : 'bg-stone-800/50 border-stone-700 hover:bg-stone-700/50 hover:border-stone-600'
+                    }`}
+                  >
+                    <div className="text-lg mb-0.5">{preset.icon}</div>
+                    <div className={`text-xs font-medium ${isSelected ? 'text-amber-300' : 'text-stone-300'}`}>
+                      {preset.name}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-stone-500 italic">
+              {WALL_STYLE_PRESETS[params.wallStyle].description}
+            </p>
           </div>
         </CollapsibleSection>
 

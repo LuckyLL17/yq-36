@@ -33,6 +33,7 @@ export const HERALDRY_COLOR_SCHEMES: Record<HeraldryColorScheme, { primary: stri
 
 export type TowerShape = 'square' | 'round' | 'polygonal' | 'd_shaped';
 export type CrenellationStyle = 'simple' | 'decorated' | 'machicolated' | 'cross_shaped';
+export type WallStyle = 'medieval' | 'roman' | 'norman' | 'gothic' | 'crusader' | 'renaissance';
 export type TerrainType = 'plain' | 'hills' | 'mountain';
 export type WeatherType = 'sunny' | 'rainy' | 'snowy' | 'foggy';
 export type NPCType = 'farmer' | 'soldier' | 'noble';
@@ -78,6 +79,92 @@ export const WEATHER_PRESETS: Record<WeatherType, { name: string; icon: string; 
     name: '雾天',
     icon: '🌫️',
     description: '云雾缭绕，如梦如幻',
+  },
+};
+
+export const WALL_STYLE_PRESETS: Record<WallStyle, {
+  name: string;
+  icon: string;
+  description: string;
+  stoneColor: string;
+  stoneColorDark: string;
+  stoneColorLight: string;
+  mortarColor: string;
+  roughness: number;
+  crenellationStyle: CrenellationStyle;
+  towerShape: TowerShape;
+}> = {
+  medieval: {
+    name: '中世纪',
+    icon: '🏰',
+    description: '经典中世纪风格，灰褐色石材，坚固厚重',
+    stoneColor: '#8b7355',
+    stoneColorDark: '#6b5b4f',
+    stoneColorLight: '#9a8b7a',
+    mortarColor: '#5a4a3a',
+    roughness: 0.85,
+    crenellationStyle: 'decorated',
+    towerShape: 'round',
+  },
+  roman: {
+    name: '罗马',
+    icon: '🏛️',
+    description: '古罗马风格，浅色凝灰岩，规整砌筑',
+    stoneColor: '#c9b896',
+    stoneColorDark: '#a89878',
+    stoneColorLight: '#dcc8a6',
+    mortarColor: '#8b7b5b',
+    roughness: 0.6,
+    crenellationStyle: 'simple',
+    towerShape: 'square',
+  },
+  norman: {
+    name: '诺曼',
+    icon: '⚔️',
+    description: '诺曼式风格，厚重方形石塔，气势雄伟',
+    stoneColor: '#7a6b5a',
+    stoneColorDark: '#5a4d3f',
+    stoneColorLight: '#8b7d6b',
+    mortarColor: '#4a3d2f',
+    roughness: 0.9,
+    crenellationStyle: 'simple',
+    towerShape: 'square',
+  },
+  gothic: {
+    name: '哥特',
+    icon: '⛪',
+    description: '哥特式风格，高耸尖塔，精致装饰',
+    stoneColor: '#9a8a7a',
+    stoneColorDark: '#7a6a5a',
+    stoneColorLight: '#aaa090',
+    mortarColor: '#6a5a4a',
+    roughness: 0.7,
+    crenellationStyle: 'cross_shaped',
+    towerShape: 'polygonal',
+  },
+  crusader: {
+    name: '十字军',
+    icon: '✝️',
+    description: '十字军风格，坚固D形塔楼，军事要塞感',
+    stoneColor: '#a08060',
+    stoneColorDark: '#806040',
+    stoneColorLight: '#b09070',
+    mortarColor: '#604020',
+    roughness: 0.8,
+    crenellationStyle: 'machicolated',
+    towerShape: 'd_shaped',
+  },
+  renaissance: {
+    name: '文艺复兴',
+    icon: '🎨',
+    description: '文艺复兴风格，典雅精致，装饰性强',
+    stoneColor: '#b8a88a',
+    stoneColorDark: '#98886a',
+    stoneColorLight: '#d0c0a0',
+    mortarColor: '#78684a',
+    roughness: 0.5,
+    crenellationStyle: 'decorated',
+    towerShape: 'polygonal',
   },
 };
 
@@ -127,6 +214,7 @@ export interface CastleParams {
   eraYear: number;
   towerShape: TowerShape;
   crenellationStyle: CrenellationStyle;
+  wallStyle: WallStyle;
   terrainType: TerrainType;
   terrainAmplitude: number;
   terrainFrequency: number;
@@ -200,6 +288,7 @@ export interface CastleState {
   setSelectedEraId: (id: string | null) => void;
   applyEraStyle: (year: number) => void;
   applyTerrainType: (type: TerrainType) => void;
+  applyWallStyle: (style: WallStyle) => void;
   applyWeather: (type: WeatherType) => void;
   setTimeOfDay: (time: number) => void;
   resetParams: () => void;
