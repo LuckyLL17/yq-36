@@ -234,11 +234,9 @@ function NPCMesh({
 }
 
 export function NPCManager({ params }: NPCManagerProps) {
-  const { residentMode, selectedNPCId, selectNPC } = useCastleStore((state) => ({
-    residentMode: state.params.residentMode,
-    selectedNPCId: state.selectedNPCId,
-    selectNPC: state.selectNPC,
-  }));
+  const residentMode = useCastleStore((state) => state.params.residentMode);
+  const selectedNPCId = useCastleStore((state) => state.selectedNPCId);
+  const selectNPC = useCastleStore((state) => state.selectNPC);
 
   const npcSystemRef = useRef<NPCSystem | null>(null);
   const npcListRef = useRef<NPC[]>([]);
