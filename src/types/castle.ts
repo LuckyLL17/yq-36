@@ -33,6 +33,34 @@ export const HERALDRY_COLOR_SCHEMES: Record<HeraldryColorScheme, { primary: stri
 
 export type TowerShape = 'square' | 'round' | 'polygonal' | 'd_shaped';
 export type CrenellationStyle = 'simple' | 'decorated' | 'machicolated' | 'cross_shaped';
+export type TerrainType = 'plain' | 'hills' | 'mountain';
+
+export const TERRAIN_PRESETS: Record<TerrainType, { name: string; icon: string; description: string; amplitude: number; frequency: number; noiseScale: number }> = {
+  plain: {
+    name: '平原',
+    icon: '🏞️',
+    description: '平坦开阔，起伏微小',
+    amplitude: 0.8,
+    frequency: 1.2,
+    noiseScale: 0.03,
+  },
+  hills: {
+    name: '丘陵',
+    icon: '⛰️',
+    description: '温和起伏，错落有致',
+    amplitude: 4.0,
+    frequency: 2.0,
+    noiseScale: 0.04,
+  },
+  mountain: {
+    name: '山地',
+    icon: '🏔️',
+    description: '陡峭险峻，峰峦叠嶂',
+    amplitude: 10.0,
+    frequency: 3.0,
+    noiseScale: 0.05,
+  },
+};
 
 export interface CastleParams {
   plotWidth: number;
@@ -53,6 +81,10 @@ export interface CastleParams {
   eraYear: number;
   towerShape: TowerShape;
   crenellationStyle: CrenellationStyle;
+  terrainType: TerrainType;
+  terrainAmplitude: number;
+  terrainFrequency: number;
+  terrainScale: number;
 }
 
 export interface CastleMeshData {
@@ -112,6 +144,7 @@ export interface CastleState {
   setCastleGeometries: (geometries: CastleMeshData | null) => void;
   setSelectedEraId: (id: string | null) => void;
   applyEraStyle: (year: number) => void;
+  applyTerrainType: (type: TerrainType) => void;
   resetParams: () => void;
   randomizeSeed: () => void;
   addRoom: (room: Room) => boolean;

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { CastleParams, CastleState, ViewMode, Room, Corridor } from '@/types/castle';
+import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS } from '@/types/castle';
 import { getInterpolatedStyle } from '@/data/historicalEras';
 
 const baseParams: CastleParams = {
@@ -21,6 +21,10 @@ const baseParams: CastleParams = {
   eraYear: 1200,
   towerShape: 'round',
   crenellationStyle: 'decorated',
+  terrainType: 'plain',
+  terrainAmplitude: TERRAIN_PRESETS.plain.amplitude,
+  terrainFrequency: TERRAIN_PRESETS.plain.frequency,
+  terrainScale: TERRAIN_PRESETS.plain.noiseScale,
 };
 
 function buildDefaultParams(): CastleParams {
@@ -180,6 +184,19 @@ export const useCastleStore = create<CastleState>((set, get) => ({
         },
       };
     }),
+  applyTerrainType: (type: TerrainType) =>
+    set((state) => {
+      const preset = TERRAIN_PRESETS[type];
+      return {
+        params: {
+          ...state.params,
+          terrainType: type,
+          terrainAmplitude: preset.amplitude,
+          terrainFrequency: preset.frequency,
+          terrainScale: preset.noiseScale,
+        },
+      };
+    }),
   resetParams: () => set({ params: buildDefaultParams() }),
   randomizeSeed: () =>
     set((state) => ({
@@ -272,7 +289,7 @@ export const useCastleStore = create<CastleState>((set, get) => ({
     return true;
   },
   clearAllRooms: () =>
-    set((state) => ({
+    set(() => ({
       interiorLayout: {
         rooms: [],
         corridors: [],

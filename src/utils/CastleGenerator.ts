@@ -5,10 +5,78 @@ import { SeededRandom } from '@/utils/seededRandom';
 export class CastleGenerator {
   private params: CastleParams;
   private rng: SeededRandom;
+  private noisePerm: number[];
 
   constructor(params: CastleParams) {
     this.params = params;
     this.rng = new SeededRandom(params.seed);
+    this.noisePerm = this.buildNoisePermutation();
+  }
+
+  private buildNoisePermutation(): number[] {
+    const perm: number[] = [];
+    for (let i = 0; i < 256; i++) perm[i] = i;
+    for (let i = 255; i > 0; i--) {
+      const j = Math.floor(this.rng.range(0, i + 1));
+      [perm[i], perm[j]] = [perm[j], perm[i]];
+    }
+    const p: number[] = [];
+    for (let i = 0; i < 512; i++) p[i] = perm[i & 255];
+    return p;
+  }
+
+  private fade(t: number): number {
+    return t * t * t * (t * (t * 6 - 15) + 10);
+  }
+
+  private lerp(a: number, b: number, t: number): number {
+    return a + t * (b - a);
+  }
+
+  private grad(hash: number, x: number, y: number): number {
+    const h = hash & 3;
+    const u = h < 2 ? x : y;
+    const v = h < 2 ? y : x;
+    return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+  }
+
+  private perlinNoise2D(x: number, y: number): number {
+    const p = this.noisePerm;
+    const X = Math.floor(x) & 255;
+    const Y = Math.floor(y) & 255;
+    const xf = x - Math.floor(x);
+    const yf = y - Math.floor(y);
+    const u = this.fade(xf);
+    const v = this.fade(yf);
+
+    const aa = p[p[X] + Y];
+    const ab = p[p[X] + Y + 1];
+    const ba = p[p[X + 1] + Y];
+    const bb = p[p[X + 1] + Y + 1];
+
+    const x1 = this.lerp(this.grad(aa, xf, yf), this.grad(ba, xf - 1, yf), u);
+    const x2 = this.lerp(this.grad(ab, xf, yf - 1), this.grad(bb, xf - 1, yf - 1), u);
+
+    return this.lerp(x1, x2, v);
+  }
+
+  getTerrainHeight(x: number, z: number): number {
+    const { terrainAmplitude, terrainFrequency, terrainScale } = this.params;
+    let total = 0;
+    let amplitude = 1;
+    let frequency = 1;
+    let maxValue = 0;
+    const octaves = 4;
+
+    for (let i = 0; i < octaves; i++) {
+      total += this.perlinNoise2D(x * terrainScale * frequency, z * terrainScale * frequency) * amplitude;
+      maxValue += amplitude;
+      amplitude *= 0.5;
+      frequency *= terrainFrequency * 0.5 + 1;
+    }
+
+    const normalized = total / maxValue;
+    return normalized * terrainAmplitude;
   }
 
   generatePlotPoints(): THREE.Vector2[] {
@@ -35,17 +103,17 @@ export class CastleGenerator {
       const p1 = plotPoints[i];
       const p2 = plotPoints[(i + 1) % plotPoints.length];
       
-      const wallGeo = this.createWallSegment(p1, p2, wallHeight, wallThickness);
+      const wallGeo = this.createWallSegmentTerrain(p1, p2, wallHeight, wallThickness);
       walls.push(wallGeo);
       
-      const crenellationGeo = this.createCrenellations(p1, p2, wallHeight, wallThickness, crenellationStyle, crenellationHeightMultiplier);
+      const crenellationGeo = this.createCrenellationsTerrain(p1, p2, wallHeight, wallThickness, crenellationStyle, crenellationHeightMultiplier);
       walls.push(crenellationGeo);
     }
 
     return walls;
   }
 
-  private createWallSegment(
+  private createWallSegmentTerrain(
     p1: THREE.Vector2,
     p2: THREE.Vector2,
     height: number,
@@ -56,17 +124,35 @@ export class CastleGenerator {
     const length = Math.sqrt(dx * dx + dy * dy);
     const angle = Math.atan2(dy, dx);
 
-    const geometry = new THREE.BoxGeometry(length, height, thickness);
+    const segments = Math.max(4, Math.floor(length / 2));
+    const geometry = new THREE.BoxGeometry(length, height, thickness, segments, 1, 1);
     geometry.translate(length / 2, height / 2, 0);
-    geometry.rotateY(-angle);
-    geometry.translate(p1.x, 0, p1.y);
+
+    const positions = geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+      const localX = positions.getX(i) - length / 2;
+      const t = (localX + length / 2) / length;
+      const worldX = p1.x + dx * t;
+      const worldZ = p1.y + dy * t;
+      const terrainH = this.getTerrainHeight(worldX, worldZ);
+
+      const localY = positions.getY(i) - height / 2;
+      if (localY < 0) {
+        positions.setY(i, terrainH + localY + height / 2);
+      } else {
+        positions.setY(i, terrainH + localY + height / 2);
+      }
+    }
+    geometry.computeVertexNormals();
 
     this.applyUVsToBox(geometry, length, height, thickness);
+    geometry.rotateY(-angle);
+    geometry.translate(p1.x, 0, p1.y);
     
     return geometry;
   }
 
-  private createCrenellations(
+  private createCrenellationsTerrain(
     p1: THREE.Vector2,
     p2: THREE.Vector2,
     wallHeight: number,
@@ -89,39 +175,42 @@ export class CastleGenerator {
     for (let i = 0; i < count; i++) {
       const x = i * (crenellationWidth + gap) + gap / 2;
       const centerX = x + crenellationWidth / 2;
-      const centerY = wallHeight + crenellationHeight / 2;
+      const t = centerX / length;
+      const worldX = p1.x + dx * t;
+      const worldZ = p1.y + dy * t;
+      const terrainH = this.getTerrainHeight(worldX, worldZ);
 
       if (style === 'simple') {
         const geo = new THREE.BoxGeometry(crenellationWidth, crenellationHeight, wallThickness * 1.05);
-        geo.translate(centerX, centerY, 0);
+        geo.translate(centerX, terrainH + wallHeight + crenellationHeight / 2, 0);
         geometries.push(geo);
       } else if (style === 'decorated') {
         const mainGeo = new THREE.BoxGeometry(crenellationWidth, crenellationHeight, wallThickness * 1.05);
-        mainGeo.translate(centerX, centerY, 0);
+        mainGeo.translate(centerX, terrainH + wallHeight + crenellationHeight / 2, 0);
         geometries.push(mainGeo);
         const capGeo = new THREE.BoxGeometry(crenellationWidth * 0.8, crenellationHeight * 0.2, wallThickness * 1.15);
-        capGeo.translate(centerX, wallHeight + crenellationHeight * 0.9, 0);
+        capGeo.translate(centerX, terrainH + wallHeight + crenellationHeight * 0.9, 0);
         geometries.push(capGeo);
       } else if (style === 'machicolated') {
         const mainGeo = new THREE.BoxGeometry(crenellationWidth, crenellationHeight, wallThickness * 1.05);
-        mainGeo.translate(centerX, centerY, 0);
+        mainGeo.translate(centerX, terrainH + wallHeight + crenellationHeight / 2, 0);
         geometries.push(mainGeo);
         const machicolationHeight = 0.5;
         const overhangGeo = new THREE.BoxGeometry(crenellationWidth, machicolationHeight, wallThickness * 1.4);
-        overhangGeo.translate(centerX, wallHeight - machicolationHeight / 2, 0);
+        overhangGeo.translate(centerX, terrainH + wallHeight - machicolationHeight / 2, 0);
         geometries.push(overhangGeo);
         const holeWidth = crenellationWidth * 0.4;
         const holeGeo = new THREE.BoxGeometry(holeWidth, machicolationHeight * 0.6, wallThickness * 1.42);
-        holeGeo.translate(centerX, wallHeight - machicolationHeight / 2, 0);
+        holeGeo.translate(centerX, terrainH + wallHeight - machicolationHeight / 2, 0);
         geometries.push(holeGeo);
       } else if (style === 'cross_shaped') {
         const mainGeo = new THREE.BoxGeometry(crenellationWidth, crenellationHeight, wallThickness * 1.05);
-        mainGeo.translate(centerX, centerY, 0);
+        mainGeo.translate(centerX, terrainH + wallHeight + crenellationHeight / 2, 0);
         geometries.push(mainGeo);
         const crossBarWidth = crenellationWidth * 1.3;
         const crossBarHeight = crenellationHeight * 0.3;
         const crossBarGeo = new THREE.BoxGeometry(crossBarWidth, crossBarHeight, wallThickness * 1.1);
-        crossBarGeo.translate(centerX, centerY, 0);
+        crossBarGeo.translate(centerX, terrainH + wallHeight + crenellationHeight / 2, 0);
         geometries.push(crossBarGeo);
       }
     }
@@ -138,7 +227,8 @@ export class CastleGenerator {
     const { towerCount, towerHeight, towerRadius, towerShape } = this.params;
 
     for (let i = 0; i < plotPoints.length; i++) {
-      const tower = this.createTower(plotPoints[i], towerHeight, towerRadius, towerShape);
+      const terrainH = this.getTerrainHeight(plotPoints[i].x, plotPoints[i].y);
+      const tower = this.createTower(plotPoints[i], towerHeight, towerRadius, towerShape, terrainH);
       towers.push(tower);
     }
 
@@ -152,9 +242,10 @@ export class CastleGenerator {
         p1.x + (p2.x - p1.x) * t,
         p1.y + (p2.y - p1.y) * t
       );
+      const terrainH = this.getTerrainHeight(midPoint.x, midPoint.y);
       const h = towerHeight * (0.8 + this.rng.range(0, 0.4));
       const r = towerRadius * (0.8 + this.rng.range(0, 0.3));
-      const tower = this.createTower(midPoint, h, r, towerShape);
+      const tower = this.createTower(midPoint, h, r, towerShape, terrainH);
       towers.push(tower);
     }
 
@@ -165,20 +256,21 @@ export class CastleGenerator {
     position: THREE.Vector2,
     height: number,
     radius: number,
-    shape: TowerShape = 'round'
+    shape: TowerShape = 'round',
+    terrainOffset: number = 0
   ): THREE.BufferGeometry {
     const geometries: THREE.BufferGeometry[] = [];
 
     if (shape === 'square') {
       const size = radius * 1.8;
       const bodyGeo = new THREE.BoxGeometry(size, height, size);
-      bodyGeo.translate(0, height / 2, 0);
+      bodyGeo.translate(0, terrainOffset + height / 2, 0);
       geometries.push(bodyGeo);
 
       const roofHeight = radius * 1.0;
       const roofGeo = new THREE.ConeGeometry(radius * 1.5, roofHeight, 4);
       roofGeo.rotateY(Math.PI / 4);
-      roofGeo.translate(0, height + roofHeight / 2, 0);
+      roofGeo.translate(0, terrainOffset + height + roofHeight / 2, 0);
       geometries.push(roofGeo);
 
       for (let side = 0; side < 4; side++) {
@@ -188,7 +280,7 @@ export class CastleGenerator {
           const windowGeo = new THREE.BoxGeometry(0.8, 1.2, 0.3);
           windowGeo.translate(
             Math.cos(angle) * (size / 2 - 0.05),
-            2 + i * 2.5,
+            terrainOffset + 2 + i * 2.5,
             Math.sin(angle) * (size / 2 - 0.05)
           );
           windowGeo.rotateY(angle);
@@ -197,12 +289,12 @@ export class CastleGenerator {
       }
     } else if (shape === 'round') {
       const bodyGeo = new THREE.CylinderGeometry(radius, radius * 1.1, height, 16);
-      bodyGeo.translate(0, height / 2, 0);
+      bodyGeo.translate(0, terrainOffset + height / 2, 0);
       geometries.push(bodyGeo);
 
       const roofHeight = radius * 1.2;
       const roofGeo = new THREE.ConeGeometry(radius * 1.2, roofHeight, 16);
-      roofGeo.translate(0, height + roofHeight / 2, 0);
+      roofGeo.translate(0, terrainOffset + height + roofHeight / 2, 0);
       geometries.push(roofGeo);
 
       const windowCount = 5;
@@ -211,7 +303,7 @@ export class CastleGenerator {
         const windowGeo = new THREE.BoxGeometry(0.8, 1.5, 0.3);
         windowGeo.translate(
           Math.cos(angle) * (radius - 0.1),
-          height * 0.5 + i * 1.2 - 1.2,
+          terrainOffset + height * 0.5 + i * 1.2 - 1.2,
           Math.sin(angle) * (radius - 0.1)
         );
         windowGeo.rotateY(angle);
@@ -220,12 +312,12 @@ export class CastleGenerator {
     } else if (shape === 'polygonal') {
       const sides = 6;
       const bodyGeo = new THREE.CylinderGeometry(radius, radius * 1.1, height, sides);
-      bodyGeo.translate(0, height / 2, 0);
+      bodyGeo.translate(0, terrainOffset + height / 2, 0);
       geometries.push(bodyGeo);
 
       const roofHeight = radius * 1.3;
       const roofGeo = new THREE.ConeGeometry(radius * 1.25, roofHeight, sides);
-      roofGeo.translate(0, height + roofHeight / 2, 0);
+      roofGeo.translate(0, terrainOffset + height + roofHeight / 2, 0);
       geometries.push(roofGeo);
 
       for (let i = 0; i < sides; i++) {
@@ -233,7 +325,7 @@ export class CastleGenerator {
         const windowGeo = new THREE.BoxGeometry(0.8, 1.4, 0.3);
         windowGeo.translate(
           Math.cos(angle) * (radius - 0.15),
-          height * 0.4 + (i % 3) * 1.8,
+          terrainOffset + height * 0.4 + (i % 3) * 1.8,
           Math.sin(angle) * (radius - 0.15)
         );
         windowGeo.rotateY(angle);
@@ -246,7 +338,7 @@ export class CastleGenerator {
         const pinnacleGeo = new THREE.ConeGeometry(radius * 0.15, radius * 0.6, 4);
         pinnacleGeo.translate(
           Math.cos(angle) * radius * 1.15,
-          height,
+          terrainOffset + height,
           Math.sin(angle) * radius * 1.15
         );
         geometries.push(pinnacleGeo);
@@ -278,12 +370,12 @@ export class CastleGenerator {
       const bodyGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
       bodyGeo.rotateX(-Math.PI / 2);
       bodyGeo.translate(0, 0, 0);
-      bodyGeo.translate(0, height / 2, 0);
+      bodyGeo.translate(0, terrainOffset + height / 2, 0);
       geometries.push(bodyGeo);
 
       const roofHeight = radius * 1.1;
       const roofGeo = new THREE.ConeGeometry(radius * 1.15, roofHeight, 8);
-      roofGeo.translate(0, height + roofHeight / 2, 0);
+      roofGeo.translate(0, terrainOffset + height + roofHeight / 2, 0);
       geometries.push(roofGeo);
 
       for (let i = 0; i < 3; i++) {
@@ -291,7 +383,7 @@ export class CastleGenerator {
         const windowGeo = new THREE.BoxGeometry(0.7, 1.3, 0.3);
         windowGeo.translate(
           Math.cos(angle) * (radius - 0.1),
-          height * 0.4 + i * 1.8,
+          terrainOffset + height * 0.4 + i * 1.8,
           Math.sin(angle) * (radius - 0.1)
         );
         windowGeo.rotateY(angle);
@@ -316,28 +408,29 @@ export class CastleGenerator {
     
     const midX = (p1.x + p2.x) / 2;
     const midZ = (p1.y + p2.y) / 2;
+    const terrainH = this.getTerrainHeight(midX, midZ);
 
     const geometries: THREE.BufferGeometry[] = [];
 
     const frameThickness = 1;
     const leftFrame = new THREE.BoxGeometry(frameThickness, gateHeight + 1, wallThickness * 1.2);
-    leftFrame.translate(-gateWidth / 2 - frameThickness / 2, (gateHeight + 1) / 2, 0);
+    leftFrame.translate(-gateWidth / 2 - frameThickness / 2, terrainH + (gateHeight + 1) / 2, 0);
     geometries.push(leftFrame);
 
     const rightFrame = new THREE.BoxGeometry(frameThickness, gateHeight + 1, wallThickness * 1.2);
-    rightFrame.translate(gateWidth / 2 + frameThickness / 2, (gateHeight + 1) / 2, 0);
+    rightFrame.translate(gateWidth / 2 + frameThickness / 2, terrainH + (gateHeight + 1) / 2, 0);
     geometries.push(rightFrame);
 
     const topFrame = new THREE.BoxGeometry(gateWidth + frameThickness * 2, frameThickness, wallThickness * 1.2);
-    topFrame.translate(0, gateHeight + 1 + frameThickness / 2, 0);
+    topFrame.translate(0, terrainH + gateHeight + 1 + frameThickness / 2, 0);
     geometries.push(topFrame);
 
     const doorLeft = new THREE.BoxGeometry(gateWidth / 2 - 0.1, gateHeight, 0.4);
-    doorLeft.translate(-gateWidth / 4, gateHeight / 2, 0);
+    doorLeft.translate(-gateWidth / 4, terrainH + gateHeight / 2, 0);
     geometries.push(doorLeft);
 
     const doorRight = new THREE.BoxGeometry(gateWidth / 2 - 0.1, gateHeight, 0.4);
-    doorRight.translate(gateWidth / 4, gateHeight / 2, 0);
+    doorRight.translate(gateWidth / 4, terrainH + gateHeight / 2, 0);
     geometries.push(doorRight);
 
     const merged = this.mergeGeometries(geometries);
@@ -409,7 +502,23 @@ export class CastleGenerator {
 
     const geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
     geometry.rotateX(-Math.PI / 2);
-    geometry.translate(0, -moatDepth, 0);
+
+    const positions = geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+      const y = positions.getY(i);
+      if (y < -0.01) {
+        const x = positions.getX(i);
+        const z = positions.getZ(i);
+        const terrainH = this.getTerrainHeight(x, z);
+        positions.setY(i, terrainH - moatDepth);
+      } else {
+        const x = positions.getX(i);
+        const z = positions.getZ(i);
+        const terrainH = this.getTerrainHeight(x, z);
+        positions.setY(i, terrainH);
+      }
+    }
+    geometry.computeVertexNormals();
 
     return geometry;
   }
@@ -441,7 +550,8 @@ export class CastleGenerator {
         );
 
         if (!overlap) {
-          const building = this.createBuilding(x, z, w, d, h);
+          const terrainH = this.getTerrainHeight(x, z);
+          const building = this.createBuilding(x, z, w, d, h, terrainH);
           buildings.push(building);
           placed.push({ x, z, w, d });
           break;
@@ -458,18 +568,19 @@ export class CastleGenerator {
     z: number,
     width: number,
     depth: number,
-    height: number
+    height: number,
+    terrainOffset: number = 0
   ): THREE.BufferGeometry {
     const geometries: THREE.BufferGeometry[] = [];
 
     const bodyGeo = new THREE.BoxGeometry(width, height, depth);
-    bodyGeo.translate(0, height / 2, 0);
+    bodyGeo.translate(0, terrainOffset + height / 2, 0);
     geometries.push(bodyGeo);
 
     const roofHeight = depth * 0.4;
     const roofGeo = new THREE.ConeGeometry(width * 0.7, roofHeight, 4);
     roofGeo.rotateY(Math.PI / 4);
-    roofGeo.translate(0, height + roofHeight / 2, 0);
+    roofGeo.translate(0, terrainOffset + height + roofHeight / 2, 0);
     geometries.push(roofGeo);
 
     const floors = Math.floor(height / 2.5);
@@ -479,7 +590,7 @@ export class CastleGenerator {
       for (let w = 0; w < winCount; w++) {
         const wx = -width / 2 + 1 + w * (width - 2) / Math.max(1, winCount - 1);
         const windowGeo = new THREE.BoxGeometry(0.8, 1, 0.1);
-        windowGeo.translate(wx, y, depth / 2 + 0.05);
+        windowGeo.translate(wx, terrainOffset + y, depth / 2 + 0.05);
         geometries.push(windowGeo);
         
         const windowBack = windowGeo.clone();
@@ -503,14 +614,15 @@ export class CastleGenerator {
       this.params.plotDepth + padding * 2
     );
 
-    const geometry = new THREE.PlaneGeometry(size, size, 50, 50);
+    const geometry = new THREE.PlaneGeometry(size, size, 120, 120);
     geometry.rotateX(-Math.PI / 2);
-    geometry.translate(0, -0.1, 0);
 
     const positions = geometry.attributes.position;
     for (let i = 0; i < positions.count; i++) {
-      const noise = this.rng.range(-0.2, 0.2);
-      positions.setY(i, -0.1 + noise);
+      const x = positions.getX(i);
+      const z = positions.getZ(i);
+      const terrainH = this.getTerrainHeight(x, z);
+      positions.setY(i, terrainH);
     }
     geometry.computeVertexNormals();
 

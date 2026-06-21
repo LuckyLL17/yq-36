@@ -1,11 +1,12 @@
-import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette } from 'lucide-react';
+import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { CollapsibleSection } from './CollapsibleSection';
 import { SliderControl } from './SliderControl';
 import { ToggleControl } from './ToggleControl';
+import { TerrainType, TERRAIN_PRESETS } from '@/types/castle';
 
 export function ControlPanel() {
-  const { params, setParams } = useCastleStore();
+  const { params, setParams, applyTerrainType } = useCastleStore();
 
   return (
     <div className="w-80 bg-stone-900/95 backdrop-blur-sm border-r border-amber-900/30 flex flex-col h-full">
@@ -24,6 +25,62 @@ export function ControlPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-stone-600 scrollbar-track-stone-800">
+        <CollapsibleSection title="地形设置" icon={<Mountain className="w-4 h-4" />}>
+          <div className="space-y-2 mb-3">
+            <p className="text-xs text-stone-400">选择地形类型</p>
+            <div className="grid grid-cols-3 gap-2">
+              {(Object.keys(TERRAIN_PRESETS) as TerrainType[]).map((type) => {
+                const preset = TERRAIN_PRESETS[type];
+                const isSelected = params.terrainType === type;
+                return (
+                  <button
+                    key={type}
+                    onClick={() => applyTerrainType(type)}
+                    className={`p-2 rounded-lg border transition-all text-center ${
+                      isSelected
+                        ? 'bg-amber-600/30 border-amber-500 ring-1 ring-amber-500'
+                        : 'bg-stone-800/50 border-stone-700 hover:bg-stone-700/50 hover:border-stone-600'
+                    }`}
+                  >
+                    <div className="text-lg mb-0.5">{preset.icon}</div>
+                    <div className={`text-xs font-medium ${isSelected ? 'text-amber-300' : 'text-stone-300'}`}>
+                      {preset.name}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-stone-500 italic">
+              {TERRAIN_PRESETS[params.terrainType].description}
+            </p>
+          </div>
+          <SliderControl
+            label="地形起伏"
+            value={params.terrainAmplitude}
+            min={0}
+            max={15}
+            step={0.2}
+            onChange={(v) => setParams({ terrainAmplitude: v })}
+            unit="m"
+          />
+          <SliderControl
+            label="地形频率"
+            value={params.terrainFrequency}
+            min={0.5}
+            max={6}
+            step={0.1}
+            onChange={(v) => setParams({ terrainFrequency: v })}
+          />
+          <SliderControl
+            label="地形粗糙度"
+            value={params.terrainScale}
+            min={0.01}
+            max={0.1}
+            step={0.005}
+            onChange={(v) => setParams({ terrainScale: v })}
+          />
+        </CollapsibleSection>
+
         <CollapsibleSection title="地块设置" icon={<Shield className="w-4 h-4" />}>
           <SliderControl
             label="地块宽度"

@@ -28,6 +28,8 @@ export function HeraldryDecoration({ params }: HeraldryDecorationProps) {
     const angle = Math.atan2(dy, dx);
     const midX = (p1.x + p2.x) / 2;
     const midZ = (p1.y + p2.y) / 2;
+    const generator = new CastleGenerator(params);
+    const terrainH = generator.getTerrainHeight(midX, midZ);
 
     const wx = dx;
     const wz = dy;
@@ -39,7 +41,7 @@ export function HeraldryDecoration({ params }: HeraldryDecorationProps) {
     const nLen = Math.sqrt(outwardX * outwardX + outwardZ * outwardZ) || 1;
 
     const offset = params.wallThickness / 2 + 0.08;
-    const gateShieldY = params.gateHeight + 1.8;
+    const gateShieldY = terrainH + params.gateHeight + 1.8;
     const gateShieldSize = Math.min(params.gateWidth * 0.7, 2.8);
 
     return {
@@ -58,12 +60,14 @@ export function HeraldryDecoration({ params }: HeraldryDecorationProps) {
     const style = getInterpolatedStyle(params.eraYear);
     const towerR = params.towerRadius * style.towerRadiusMultiplier;
     const towerH = params.towerHeight * style.towerHeightMultiplier;
+    const generator = new CastleGenerator(params);
 
     return plotPoints.map((point, i) => {
       const nextPoint = plotPoints[(i + 1) % plotPoints.length];
       const dx = nextPoint.x - point.x;
       const dy = nextPoint.y - point.y;
       const angle = Math.atan2(dy, dx);
+      const terrainH = generator.getTerrainHeight(point.x, point.y);
 
       const wx = dx;
       const wz = dy;
@@ -75,7 +79,7 @@ export function HeraldryDecoration({ params }: HeraldryDecorationProps) {
       const nLen = Math.sqrt(outwardX * outwardX + outwardZ * outwardZ) || 1;
 
       const offset = towerR + 0.06;
-      const shieldY = towerH * 0.55;
+      const shieldY = terrainH + towerH * 0.55;
       const shieldW = towerR * 1.1;
       const shieldH = towerR * 1.3;
 

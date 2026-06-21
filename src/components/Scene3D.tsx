@@ -69,6 +69,7 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
     const towerH = params.towerHeight * style.towerHeightMultiplier;
     const towerR = params.towerRadius * style.towerRadiusMultiplier;
     const roofHeight = towerR * 1.2;
+    const generator = new CastleGenerator(params);
 
     const towers: { position: [number, number, number]; rotation: [number, number, number] }[] = [];
 
@@ -83,7 +84,8 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
       const dirZ = point.y === 0 ? 0 : (point.y > 0 ? 1 : -1);
       const len = Math.sqrt(dirX * dirX + dirZ * dirZ) || 1;
 
-      const baseY = towerH + roofHeight;
+      const terrainH = generator.getTerrainHeight(point.x, point.y);
+      const baseY = terrainH + towerH + roofHeight;
       towers.push({
         position: [
           point.x + (dirX / len) * towerR * 0.3,
@@ -121,10 +123,12 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
       const r = towerR * 0.9;
       const rH = r * 1.2;
 
+      const terrainH = generator.getTerrainHeight(midX, midZ);
+
       towers.push({
         position: [
           midX + (outwardX / nLen) * r * 0.3,
-          h + rH,
+          terrainH + h + rH,
           midZ + (outwardZ / nLen) * r * 0.3,
         ],
         rotation: [0, -angle + Math.PI / 2, 0],
@@ -142,6 +146,8 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
     const angle = Math.atan2(dy, dx);
     const midX = (p1.x + p2.x) / 2;
     const midZ = (p1.y + p2.y) / 2;
+    const generator = new CastleGenerator(params);
+    const terrainH = generator.getTerrainHeight(midX, midZ);
 
     const wx = dx;
     const wz = dy;
@@ -154,7 +160,7 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
     const outwardZ = dot >= 0 ? n1z : -n1z;
     const nLen = Math.sqrt(outwardX * outwardX + outwardZ * outwardZ) || 1;
 
-    const gateTopY = params.gateHeight + 2;
+    const gateTopY = terrainH + params.gateHeight + 2;
     const offset = params.wallThickness * 0.6 + 0.5;
 
     return {
@@ -190,7 +196,7 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
       />
       <SiegeScene viewMode={viewMode} />
       <Grid
-        position={[0, -0.09, 0]}
+        position={[0, -0.5, 0]}
         args={[200, 200]}
         cellSize={5}
         cellThickness={0.5}
@@ -205,10 +211,10 @@ function SceneContent({ viewMode }: { viewMode: ViewMode }) {
       />
       <ContactShadows
         position={[0, 0.01, 0]}
-        opacity={0.4}
-        scale={100}
-        blur={2}
-        far={10}
+        opacity={0.3}
+        scale={200}
+        blur={3}
+        far={30}
         color="#000000"
       />
     </>
