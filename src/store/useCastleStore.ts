@@ -1,6 +1,7 @@
 import { create } from 'zustand';
-import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, WallStyle, WALL_STYLE_PRESETS, TowerType, TOWER_TYPE_INFO, DEFAULT_TOWER_PARAMS, DEFAULT_MOAT_WATER_PARAMS, MoatSegment, TowerSpecificParams, BuildingType, UVMappingMode, MaterialParams, DEFAULT_MATERIAL_PARAMS, PanelGroupId } from '@/types/castle';
+import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, WallStyle, WALL_STYLE_PRESETS, TowerType, TOWER_TYPE_INFO, DEFAULT_TOWER_PARAMS, DEFAULT_MOAT_WATER_PARAMS, MoatSegment, TowerSpecificParams, BuildingType, UVMappingMode, MaterialParams, DEFAULT_MATERIAL_PARAMS, PanelGroupId, GenerationAlgorithm, LSystemConfig, CellularAutomataConfig, EvolutionConfig, DEFAULT_LSYSTEM_CONFIG, DEFAULT_CELLULAR_AUTOMATA_CONFIG, DEFAULT_EVOLUTION_CONFIG } from '@/types/castle';
 import { getInterpolatedStyle } from '@/data/historicalEras';
+import { GenerationStrategy } from '@/utils/generation/GenerationStrategy';
 
 function generateDefaultMoatSegments(): MoatSegment[] {
   return [
@@ -62,6 +63,10 @@ const baseParams: CastleParams = {
   },
   gateAnimationSync: false,
   materialParams: { ...DEFAULT_MATERIAL_PARAMS },
+  generationAlgorithm: 'rule_based' as GenerationAlgorithm,
+  lsystemConfig: { ...DEFAULT_LSYSTEM_CONFIG },
+  cellularAutomataConfig: { ...DEFAULT_CELLULAR_AUTOMATA_CONFIG },
+  evolutionConfig: { ...DEFAULT_EVOLUTION_CONFIG },
 };
 
 function buildDefaultParams(): CastleParams {
@@ -80,6 +85,10 @@ function buildDefaultParams(): CastleParams {
     moatSegments: generateDefaultMoatSegments(),
     moatWaterParams: { ...DEFAULT_MOAT_WATER_PARAMS },
     materialParams: { ...DEFAULT_MATERIAL_PARAMS },
+    generationAlgorithm: 'rule_based' as GenerationAlgorithm,
+    lsystemConfig: { ...DEFAULT_LSYSTEM_CONFIG },
+    cellularAutomataConfig: { ...DEFAULT_CELLULAR_AUTOMATA_CONFIG },
+    evolutionConfig: { ...DEFAULT_EVOLUTION_CONFIG },
   };
 }
 
@@ -298,6 +307,7 @@ export const useCastleStore = create<CastleState>((set, get) => ({
     residents: true,
     materials: true,
     seed: true,
+    generation: true,
   },
   setParams: (newParams) =>
     set((state) => ({
@@ -632,6 +642,24 @@ export const useCastleStore = create<CastleState>((set, get) => ({
     })),
   randomizeAllParams: () =>
     set((state) => {
+      const algorithm = state.params.generationAlgorithm;
+
+      if (algorithm !== 'rule_based') {
+        const strategy = new GenerationStrategy(state.params.seed);
+        const result = strategy.generate(
+          algorithm,
+          state.params,
+          state.params.lsystemConfig,
+          state.params.cellularAutomataConfig,
+          state.params.evolutionConfig
+        );
+        const newParams = { ...state.params, ...result.params };
+        if (!state.lockedParams.has('seed') && result.params.seed !== undefined) {
+          newParams.seed = result.params.seed;
+        }
+        return { params: newParams };
+      }
+
       let newParams = { ...state.params };
       const locked = state.lockedParams;
 
@@ -696,4 +724,65 @@ export const useCastleStore = create<CastleState>((set, get) => ({
     set(() => ({
       lockedParams: new Set<string>(),
     })),
+  setGenerationAlgorithm: (algorithm: GenerationAlgorithm) =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        generationAlgorithm: algorithm,
+      },
+    })),
+  updateLSystemConfig: (updates: Partial<LSystemConfig>) =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        lsystemConfig: {
+          ...state.params.lsystemConfig,
+          ...updates,
+        },
+      },
+    })),
+  updateCellularAutomataConfig: (updates: Partial<CellularAutomataConfig>) =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        cellularAutomataConfig: {
+          ...state.params.cellularAutomataConfig,
+          ...updates,
+        },
+      },
+    })),
+  updateEvolutionConfig: (updates: Partial<EvolutionConfig>) =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        evolutionConfig: {
+          ...state.params.evolutionConfig,
+          ...updates,
+        },
+      },
+    })),
+  runEvolution: () =>
+    set((state) => {
+      const strategy = new GenerationStrategy(state.params.seed);
+      const result = strategy.generate(
+        'evolutionary',
+        state.params,
+        state.params.lsystemConfig,
+        state.params.cellularAutomataConfig,
+        state.params.evolutionConfig
+      );
+      const evolutionResult = result.metadata.evolutionResult;
+      const newParams = { ...state.params, ...result.params };
+      return {
+        params: newParams,
+        evolutionStats: evolutionResult
+          ? {
+              generation: evolutionResult.generation,
+              bestFitness: evolutionResult.bestIndividual.fitness,
+              avgFitness: evolutionResult.avgFitnessHistory[evolutionResult.avgFitnessHistory.length - 1] ?? 0,
+            }
+          : null,
+      };
+    }),
+  evolutionStats: null,
 }));

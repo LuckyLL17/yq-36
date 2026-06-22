@@ -1,4 +1,4 @@
-import { X, Eye, EyeOff, Mountain, CloudSun, Layers, Hash, Building2, Shield, Castle, DoorOpen, Droplets, Users, Palette } from 'lucide-react';
+import { X, Eye, EyeOff, Mountain, CloudSun, Layers, Hash, Building2, Shield, Castle, DoorOpen, Droplets, Users, Palette, Dna } from 'lucide-react';
 import { PanelGroupId } from '@/types/castle';
 import { cn } from '@/lib/utils';
 
@@ -24,6 +24,7 @@ const PANEL_GROUP_CONFIG: { id: PanelGroupId; title: string; icon: React.ReactNo
   { id: 'residents', title: '居民模式', icon: <Users className="w-4 h-4" /> },
   { id: 'materials', title: '材质效果', icon: <Palette className="w-4 h-4" /> },
   { id: 'seed', title: '随机种子', icon: <Hash className="w-4 h-4" /> },
+  { id: 'generation', title: '生成算法', icon: <Dna className="w-4 h-4" /> },
 ];
 
 export function PanelSettingsDialog({

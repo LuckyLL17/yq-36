@@ -416,6 +416,10 @@ export interface CastleParams {
   buildingTypeDistribution: Record<BuildingType, number>;
   gateAnimationSync: boolean;
   materialParams: MaterialParams;
+  generationAlgorithm: GenerationAlgorithm;
+  lsystemConfig: LSystemConfig;
+  cellularAutomataConfig: CellularAutomataConfig;
+  evolutionConfig: EvolutionConfig;
 }
 
 export interface CastleMeshData {
@@ -506,7 +510,112 @@ export interface RoomTemplate {
   color: string;
 }
 
-export type PanelGroupId = 'terrain' | 'weather' | 'wallStyle' | 'plot' | 'walls' | 'towers' | 'gates' | 'moat' | 'buildings' | 'residents' | 'materials' | 'seed';
+export type GenerationAlgorithm = 'rule_based' | 'lsystem' | 'cellular_automata' | 'evolutionary';
+
+export const GENERATION_ALGORITHM_INFO: Record<GenerationAlgorithm, { name: string; icon: string; description: string }> = {
+  rule_based: {
+    name: '规则生成',
+    icon: '⚙️',
+    description: '基于预设规则和参数范围的传统随机生成',
+  },
+  lsystem: {
+    name: 'L-系统',
+    icon: '🌿',
+    description: '基于Lindenmayer系统生成自相似的分形结构布局',
+  },
+  cellular_automata: {
+    name: '细胞自动机',
+    icon: '🧫',
+    description: '通过细胞自动机模拟有机生长与演化过程',
+  },
+  evolutionary: {
+    name: '进化算法',
+    icon: '🧬',
+    description: '通过适应度函数驱动的遗传算法优化城堡参数',
+  },
+};
+
+export interface LSystemConfig {
+  axiom: string;
+  rules: Record<string, string>;
+  iterations: number;
+  angle: number;
+  segmentLength: number;
+  wallSegmentRules: boolean;
+  towerBranchRules: boolean;
+  moatPatternRules: boolean;
+}
+
+export const DEFAULT_LSYSTEM_CONFIG: LSystemConfig = {
+  axiom: 'F[+F]F[-F]F',
+  rules: {
+    'F': 'FF[+F][-F][F]',
+    '+': '+',
+    '-': '-',
+  },
+  iterations: 3,
+  angle: 25,
+  segmentLength: 5,
+  wallSegmentRules: true,
+  towerBranchRules: true,
+  moatPatternRules: false,
+};
+
+export interface CellularAutomataConfig {
+  gridSize: number;
+  birthRule: number[];
+  surviveRule: number[];
+  fillRatio: number;
+  iterations: number;
+  neighborhood: 'moore' | 'vonneumann';
+  applyToTerrain: boolean;
+  applyToBuildings: boolean;
+  applyToWalls: boolean;
+}
+
+export const DEFAULT_CELLULAR_AUTOMATA_CONFIG: CellularAutomataConfig = {
+  gridSize: 32,
+  birthRule: [5, 6, 7, 8],
+  surviveRule: [4, 5, 6, 7, 8],
+  fillRatio: 0.45,
+  iterations: 5,
+  neighborhood: 'moore',
+  applyToTerrain: true,
+  applyToBuildings: true,
+  applyToWalls: false,
+};
+
+export interface EvolutionConfig {
+  populationSize: number;
+  generations: number;
+  mutationRate: number;
+  crossoverRate: number;
+  eliteCount: number;
+  fitnessWeights: {
+    defense: number;
+    aesthetics: number;
+    resourceEfficiency: number;
+    structuralIntegrity: number;
+  };
+  tournamentSize: number;
+}
+
+export const DEFAULT_EVOLUTION_CONFIG: EvolutionConfig = {
+  populationSize: 30,
+  generations: 50,
+  mutationRate: 0.15,
+  crossoverRate: 0.7,
+  eliteCount: 2,
+  fitnessWeights: {
+    defense: 0.35,
+    aesthetics: 0.25,
+    resourceEfficiency: 0.2,
+    structuralIntegrity: 0.2,
+  },
+  tournamentSize: 3,
+};
+
+export type PanelGroupId = 'terrain' | 'weather' | 'wallStyle' | 'plot' | 'walls' | 'towers' | 'gates' | 'moat' | 'buildings' | 'residents' | 'materials' | 'seed' | 'generation';
 
 export interface PanelGroupConfig {
   id: PanelGroupId;
@@ -576,4 +685,10 @@ export interface CastleState {
   randomizeAllParams: () => void;
   lockAllParams: () => void;
   unlockAllParams: () => void;
+  setGenerationAlgorithm: (algorithm: GenerationAlgorithm) => void;
+  updateLSystemConfig: (updates: Partial<LSystemConfig>) => void;
+  updateCellularAutomataConfig: (updates: Partial<CellularAutomataConfig>) => void;
+  updateEvolutionConfig: (updates: Partial<EvolutionConfig>) => void;
+  runEvolution: () => void;
+  evolutionStats: { generation: number; bestFitness: number; avgFitness: number } | null;
 }

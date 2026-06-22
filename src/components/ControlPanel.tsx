@@ -1,12 +1,14 @@
 import { useState } from 'react';
-import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock, Users, Layers, ChevronDown, ChevronUp, Anchor, Waves, TrendingUp, Castle as CastleIcon, Lock, Unlock, Unlink, Link2, TreeDeciduous, Droplet, Scissors, Fan, Leaf, RotateCcw, Shuffle, Eye, Settings } from 'lucide-react';
+import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock, Users, Layers, ChevronDown, ChevronUp, Anchor, Waves, TrendingUp, Castle as CastleIcon, Lock, Unlock, Unlink, Link2, TreeDeciduous, Droplet, Scissors, Fan, Leaf, RotateCcw, Shuffle, Eye, Settings, Dna, Grid3x3, GitBranch, Play } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { CollapsibleSection } from './CollapsibleSection';
 import { SliderControl } from './SliderControl';
 import { ToggleControl } from './ToggleControl';
 import { PanelSettingsDialog } from './PanelSettingsDialog';
 import { cn } from '@/lib/utils';
-import { TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, NPC_TYPE_INFO, NPCType, WallStyle, WALL_STYLE_PRESETS, TowerType, TOWER_TYPE_INFO, MoatSegment, BuildingType, BUILDING_TYPE_INFO, PanelGroupId } from '@/types/castle';
+import { TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, NPC_TYPE_INFO, NPCType, WallStyle, WALL_STYLE_PRESETS, TowerType, TOWER_TYPE_INFO, MoatSegment, BuildingType, BUILDING_TYPE_INFO, PanelGroupId, GenerationAlgorithm, GENERATION_ALGORITHM_INFO, LSystemConfig, CellularAutomataConfig, EvolutionConfig, DEFAULT_LSYSTEM_CONFIG, DEFAULT_CELLULAR_AUTOMATA_CONFIG, DEFAULT_EVOLUTION_CONFIG } from '@/types/castle';
+import { LSystemEngine } from '@/utils/generation/LSystemEngine';
+import { CellularAutomataEngine } from '@/utils/generation/CellularAutomataEngine';
 
 const GROUP_PARAMS: Record<PanelGroupId, string[]> = {
   terrain: ['terrainType', 'terrainAmplitude', 'terrainFrequency', 'terrainScale'],
@@ -53,6 +55,7 @@ const GROUP_PARAMS: Record<PanelGroupId, string[]> = {
     'materialParams.waterRippleLevel',
     'materialParams.waterClarity'],
   seed: ['seed'],
+  generation: ['generationAlgorithm'],
 };
 
 function formatTime(hours: number): string {
@@ -100,6 +103,12 @@ export function ControlPanel() {
     randomizeAllParams,
     lockAllParams,
     unlockAllParams,
+    setGenerationAlgorithm,
+    updateLSystemConfig,
+    updateCellularAutomataConfig,
+    updateEvolutionConfig,
+    runEvolution,
+    evolutionStats,
   } = useCastleStore();
 
   const isGroupLocked = (groupId: PanelGroupId): boolean => {
@@ -1659,6 +1668,427 @@ export function ControlPanel() {
               onToggleLock={toggleParamLock}
             />
           </div>
+        </CollapsibleSection>
+        )}
+
+        {panelGroups.generation && (
+        <CollapsibleSection
+          title="生成算法"
+          icon={<Dna className="w-4 h-4" />}
+          defaultOpen
+          locked={isGroupLocked('generation')}
+          onToggleLock={() => toggleGroupLock('generation')}
+        >
+          <div className="space-y-2 mb-3">
+            <p className="text-xs text-stone-400">选择城堡生成算法</p>
+            <div className="grid grid-cols-2 gap-2">
+              {(Object.keys(GENERATION_ALGORITHM_INFO) as GenerationAlgorithm[]).map((algo) => {
+                const info = GENERATION_ALGORITHM_INFO[algo];
+                const isSelected = params.generationAlgorithm === algo;
+                return (
+                  <button
+                    key={algo}
+                    onClick={() => setGenerationAlgorithm(algo)}
+                    className={cn(
+                      'p-2 rounded-lg border transition-all text-center',
+                      isSelected
+                        ? 'bg-emerald-600/30 border-emerald-500 ring-1 ring-emerald-500'
+                        : 'bg-stone-800/50 border-stone-700 hover:bg-stone-700/50 hover:border-stone-600'
+                    )}
+                  >
+                    <div className="text-lg mb-0.5">{info.icon}</div>
+                    <div className={`text-xs font-medium ${isSelected ? 'text-emerald-300' : 'text-stone-300'}`}>
+                      {info.name}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-stone-500 italic">
+              {GENERATION_ALGORITHM_INFO[params.generationAlgorithm].description}
+            </p>
+          </div>
+
+          {params.generationAlgorithm === 'lsystem' && (
+            <div className="p-2 bg-emerald-900/20 rounded-lg border border-emerald-800/30">
+              <p className="text-xs text-emerald-300 font-medium mb-2 flex items-center gap-1.5">
+                <GitBranch className="w-3.5 h-3.5" />
+                L-系统参数
+              </p>
+              <div className="space-y-2 mb-3">
+                <p className="text-[10px] text-stone-400">预设规则</p>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(['classic', 'branching', 'organic', 'fortress', 'fractal'] as const).map((preset) => {
+                    const presetNames: Record<string, string> = {
+                      classic: '经典',
+                      branching: '分支',
+                      organic: '有机',
+                      fortress: '堡垒',
+                      fractal: '分形',
+                    };
+                    const isSelected = params.lsystemConfig.axiom === DEFAULT_LSYSTEM_CONFIG.axiom;
+                    return (
+                      <button
+                        key={preset}
+                        onClick={() => {
+                          const presetConfig = LSystemEngine.PRESETS[preset];
+                          if (presetConfig) updateLSystemConfig(presetConfig);
+                        }}
+                        className="px-2 py-1.5 bg-stone-800/50 border border-stone-700 hover:bg-stone-700/50 hover:border-stone-600 rounded text-[10px] text-stone-300 transition-colors"
+                      >
+                        {presetNames[preset]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] text-stone-400 w-12">公理</label>
+                  <input
+                    type="text"
+                    value={params.lsystemConfig.axiom}
+                    onChange={(e) => updateLSystemConfig({ axiom: e.target.value })}
+                    className="flex-1 px-2 py-1 bg-stone-800 border border-stone-600 rounded text-xs text-stone-200 font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+                <SliderControl
+                  label="迭代次数"
+                  value={params.lsystemConfig.iterations}
+                  min={1}
+                  max={6}
+                  step={1}
+                  onChange={(v) => updateLSystemConfig({ iterations: v })}
+                  unit="次"
+                  locked={false}
+                  paramKey="lsystem.iterations"
+                  onToggleLock={() => {}}
+                />
+                <SliderControl
+                  label="分支角度"
+                  value={params.lsystemConfig.angle}
+                  min={5}
+                  max={90}
+                  step={1}
+                  onChange={(v) => updateLSystemConfig({ angle: v })}
+                  unit="°"
+                  locked={false}
+                  paramKey="lsystem.angle"
+                  onToggleLock={() => {}}
+                />
+                <SliderControl
+                  label="段长度"
+                  value={params.lsystemConfig.segmentLength}
+                  min={1}
+                  max={15}
+                  step={0.5}
+                  onChange={(v) => updateLSystemConfig({ segmentLength: v })}
+                  unit="m"
+                  locked={false}
+                  paramKey="lsystem.segmentLength"
+                  onToggleLock={() => {}}
+                />
+                <div className="mt-2 space-y-1">
+                  <ToggleControl
+                    label="城墙分段规则"
+                    checked={params.lsystemConfig.wallSegmentRules}
+                    onChange={(v) => updateLSystemConfig({ wallSegmentRules: v })}
+                    locked={false}
+                    paramKey="lsystem.wallSegmentRules"
+                    onToggleLock={() => {}}
+                  />
+                  <ToggleControl
+                    label="塔楼分支规则"
+                    checked={params.lsystemConfig.towerBranchRules}
+                    onChange={(v) => updateLSystemConfig({ towerBranchRules: v })}
+                    locked={false}
+                    paramKey="lsystem.towerBranchRules"
+                    onToggleLock={() => {}}
+                  />
+                  <ToggleControl
+                    label="护城河图案规则"
+                    checked={params.lsystemConfig.moatPatternRules}
+                    onChange={(v) => updateLSystemConfig({ moatPatternRules: v })}
+                    locked={false}
+                    paramKey="lsystem.moatPatternRules"
+                    onToggleLock={() => {}}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {params.generationAlgorithm === 'cellular_automata' && (
+            <div className="p-2 bg-emerald-900/20 rounded-lg border border-emerald-800/30">
+              <p className="text-xs text-emerald-300 font-medium mb-2 flex items-center gap-1.5">
+                <Grid3x3 className="w-3.5 h-3.5" />
+                细胞自动机参数
+              </p>
+              <div className="space-y-2 mb-3">
+                <p className="text-[10px] text-stone-400">预设规则</p>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {(['cave', 'organic', 'maze', 'settlement'] as const).map((preset) => {
+                    const presetNames: Record<string, string> = {
+                      cave: '洞穴',
+                      organic: '有机',
+                      maze: '迷宫',
+                      settlement: '聚落',
+                    };
+                    return (
+                      <button
+                        key={preset}
+                        onClick={() => {
+                          const presetConfig = CellularAutomataEngine.PRESETS[preset];
+                          if (presetConfig) updateCellularAutomataConfig(presetConfig);
+                        }}
+                        className="px-2 py-1.5 bg-stone-800/50 border border-stone-700 hover:bg-stone-700/50 hover:border-stone-600 rounded text-[10px] text-stone-300 transition-colors"
+                      >
+                        {presetNames[preset]}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                <SliderControl
+                  label="网格大小"
+                  value={params.cellularAutomataConfig.gridSize}
+                  min={8}
+                  max={64}
+                  step={4}
+                  onChange={(v) => updateCellularAutomataConfig({ gridSize: v })}
+                  locked={false}
+                  paramKey="ca.gridSize"
+                  onToggleLock={() => {}}
+                />
+                <SliderControl
+                  label="初始填充率"
+                  value={params.cellularAutomataConfig.fillRatio}
+                  min={0.1}
+                  max={0.8}
+                  step={0.05}
+                  onChange={(v) => updateCellularAutomataConfig({ fillRatio: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  locked={false}
+                  paramKey="ca.fillRatio"
+                  onToggleLock={() => {}}
+                />
+                <SliderControl
+                  label="迭代次数"
+                  value={params.cellularAutomataConfig.iterations}
+                  min={1}
+                  max={12}
+                  step={1}
+                  onChange={(v) => updateCellularAutomataConfig({ iterations: v })}
+                  unit="次"
+                  locked={false}
+                  paramKey="ca.iterations"
+                  onToggleLock={() => {}}
+                />
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-[10px] text-stone-400">邻域</span>
+                  <button
+                    onClick={() => updateCellularAutomataConfig({ neighborhood: 'moore' })}
+                    className={cn(
+                      'px-2 py-1 rounded text-[10px] transition-colors',
+                      params.cellularAutomataConfig.neighborhood === 'moore'
+                        ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500'
+                        : 'bg-stone-800/50 text-stone-400 border border-stone-700'
+                    )}
+                  >
+                    Moore (8邻)
+                  </button>
+                  <button
+                    onClick={() => updateCellularAutomataConfig({ neighborhood: 'vonneumann' })}
+                    className={cn(
+                      'px-2 py-1 rounded text-[10px] transition-colors',
+                      params.cellularAutomataConfig.neighborhood === 'vonneumann'
+                        ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500'
+                        : 'bg-stone-800/50 text-stone-400 border border-stone-700'
+                    )}
+                  >
+                    VonNeumann (4邻)
+                  </button>
+                </div>
+                <div className="mt-2 space-y-1">
+                  <ToggleControl
+                    label="应用于地形"
+                    checked={params.cellularAutomataConfig.applyToTerrain}
+                    onChange={(v) => updateCellularAutomataConfig({ applyToTerrain: v })}
+                    locked={false}
+                    paramKey="ca.applyToTerrain"
+                    onToggleLock={() => {}}
+                  />
+                  <ToggleControl
+                    label="应用于建筑"
+                    checked={params.cellularAutomataConfig.applyToBuildings}
+                    onChange={(v) => updateCellularAutomataConfig({ applyToBuildings: v })}
+                    locked={false}
+                    paramKey="ca.applyToBuildings"
+                    onToggleLock={() => {}}
+                  />
+                  <ToggleControl
+                    label="应用于城墙"
+                    checked={params.cellularAutomataConfig.applyToWalls}
+                    onChange={(v) => updateCellularAutomataConfig({ applyToWalls: v })}
+                    locked={false}
+                    paramKey="ca.applyToWalls"
+                    onToggleLock={() => {}}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {params.generationAlgorithm === 'evolutionary' && (
+            <div className="p-2 bg-emerald-900/20 rounded-lg border border-emerald-800/30">
+              <p className="text-xs text-emerald-300 font-medium mb-2 flex items-center gap-1.5">
+                <Dna className="w-3.5 h-3.5" />
+                进化算法参数
+              </p>
+              <div className="space-y-1.5">
+                <SliderControl
+                  label="种群大小"
+                  value={params.evolutionConfig.populationSize}
+                  min={10}
+                  max={100}
+                  step={5}
+                  onChange={(v) => updateEvolutionConfig({ populationSize: v })}
+                  unit="个"
+                  locked={false}
+                  paramKey="evo.populationSize"
+                  onToggleLock={() => {}}
+                />
+                <SliderControl
+                  label="进化代数"
+                  value={params.evolutionConfig.generations}
+                  min={10}
+                  max={200}
+                  step={10}
+                  onChange={(v) => updateEvolutionConfig({ generations: v })}
+                  unit="代"
+                  locked={false}
+                  paramKey="evo.generations"
+                  onToggleLock={() => {}}
+                />
+                <SliderControl
+                  label="变异率"
+                  value={params.evolutionConfig.mutationRate}
+                  min={0.01}
+                  max={0.5}
+                  step={0.01}
+                  onChange={(v) => updateEvolutionConfig({ mutationRate: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  locked={false}
+                  paramKey="evo.mutationRate"
+                  onToggleLock={() => {}}
+                />
+                <SliderControl
+                  label="交叉率"
+                  value={params.evolutionConfig.crossoverRate}
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => updateEvolutionConfig({ crossoverRate: v })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  locked={false}
+                  paramKey="evo.crossoverRate"
+                  onToggleLock={() => {}}
+                />
+                <SliderControl
+                  label="精英数量"
+                  value={params.evolutionConfig.eliteCount}
+                  min={1}
+                  max={5}
+                  step={1}
+                  onChange={(v) => updateEvolutionConfig({ eliteCount: v })}
+                  unit="个"
+                  locked={false}
+                  paramKey="evo.eliteCount"
+                  onToggleLock={() => {}}
+                />
+              </div>
+
+              <div className="mt-3 pt-3 border-t border-stone-700/50">
+                <p className="text-xs text-stone-400 mb-2">适应度权重</p>
+                <SliderControl
+                  label="防御能力"
+                  value={params.evolutionConfig.fitnessWeights.defense}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => updateEvolutionConfig({ fitnessWeights: { ...params.evolutionConfig.fitnessWeights, defense: v } })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  locked={false}
+                  paramKey="evo.fitnessDefense"
+                  onToggleLock={() => {}}
+                />
+                <SliderControl
+                  label="美观度"
+                  value={params.evolutionConfig.fitnessWeights.aesthetics}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => updateEvolutionConfig({ fitnessWeights: { ...params.evolutionConfig.fitnessWeights, aesthetics: v } })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  locked={false}
+                  paramKey="evo.fitnessAesthetics"
+                  onToggleLock={() => {}}
+                />
+                <SliderControl
+                  label="资源效率"
+                  value={params.evolutionConfig.fitnessWeights.resourceEfficiency}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => updateEvolutionConfig({ fitnessWeights: { ...params.evolutionConfig.fitnessWeights, resourceEfficiency: v } })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  locked={false}
+                  paramKey="evo.fitnessResource"
+                  onToggleLock={() => {}}
+                />
+                <SliderControl
+                  label="结构完整性"
+                  value={params.evolutionConfig.fitnessWeights.structuralIntegrity}
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  onChange={(v) => updateEvolutionConfig({ fitnessWeights: { ...params.evolutionConfig.fitnessWeights, structuralIntegrity: v } })}
+                  format={(v) => `${Math.round(v * 100)}%`}
+                  locked={false}
+                  paramKey="evo.fitnessStructural"
+                  onToggleLock={() => {}}
+                />
+              </div>
+
+              <button
+                onClick={runEvolution}
+                className="w-full mt-3 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg text-white text-xs font-medium transition-colors"
+              >
+                <Play className="w-3.5 h-3.5" />
+                运行进化
+              </button>
+
+              {evolutionStats && (
+                <div className="mt-2 p-2 bg-stone-800/60 rounded border border-stone-700/50">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <div className="text-[10px] text-stone-500">代数</div>
+                      <div className="text-xs text-emerald-400 font-mono">{evolutionStats.generation}</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-stone-500">最佳适应度</div>
+                      <div className="text-xs text-emerald-400 font-mono">{(evolutionStats.bestFitness * 100).toFixed(1)}%</div>
+                    </div>
+                    <div>
+                      <div className="text-[10px] text-stone-500">平均适应度</div>
+                      <div className="text-xs text-emerald-400 font-mono">{(evolutionStats.avgFitness * 100).toFixed(1)}%</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </CollapsibleSection>
         )}
 
