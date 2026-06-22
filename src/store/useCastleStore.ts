@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WallStyle, WALL_STYLE_PRESETS, TowerType, DEFAULT_TOWER_PARAMS, DEFAULT_MOAT_WATER_PARAMS, MoatSegment, TowerSpecificParams, BuildingType, UVMappingMode } from '@/types/castle';
+import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WallStyle, WALL_STYLE_PRESETS, TowerType, DEFAULT_TOWER_PARAMS, DEFAULT_MOAT_WATER_PARAMS, MoatSegment, TowerSpecificParams, BuildingType, UVMappingMode, MaterialParams, DEFAULT_MATERIAL_PARAMS } from '@/types/castle';
 import { getInterpolatedStyle } from '@/data/historicalEras';
 
 function generateDefaultMoatSegments(): MoatSegment[] {
@@ -61,6 +61,7 @@ const baseParams: CastleParams = {
     barracks: 2,
   },
   gateAnimationSync: false,
+  materialParams: { ...DEFAULT_MATERIAL_PARAMS },
 };
 
 function buildDefaultParams(): CastleParams {
@@ -78,6 +79,7 @@ function buildDefaultParams(): CastleParams {
     towerSpecificParams: { ...DEFAULT_TOWER_PARAMS },
     moatSegments: generateDefaultMoatSegments(),
     moatWaterParams: { ...DEFAULT_MOAT_WATER_PARAMS },
+    materialParams: { ...DEFAULT_MATERIAL_PARAMS },
   };
 }
 
@@ -488,5 +490,22 @@ export const useCastleStore = create<CastleState>((set, get) => ({
   toggleShowSeams: () =>
     set((state) => ({
       showSeams: !state.showSeams,
+    })),
+  setMaterialParams: (newParams: Partial<MaterialParams>) =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        materialParams: {
+          ...state.params.materialParams,
+          ...newParams,
+        },
+      },
+    })),
+  resetMaterialParams: () =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        materialParams: { ...DEFAULT_MATERIAL_PARAMS },
+      },
     })),
 }));

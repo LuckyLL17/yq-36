@@ -105,17 +105,18 @@ export function Castle({ params, viewMode }: CastleProps) {
     if (viewMode === 'uv') {
       return MaterialFactory.getCheckerboardMaterial();
     }
+    const materialParams = params.materialParams;
     switch (type) {
       case 'stone':
-        return MaterialFactory.getStoneMaterial(false, params.wallStyle);
+        return MaterialFactory.getStoneMaterial(false, params.wallStyle, materialParams);
       case 'wood':
-        return MaterialFactory.getWoodMaterial();
+        return MaterialFactory.getWoodMaterial(false, materialParams);
       case 'roof':
         return MaterialFactory.getRoofMaterial();
       case 'ground':
-        return MaterialFactory.getGroundMaterial();
+        return MaterialFactory.getGroundMaterial(materialParams);
       case 'water':
-        return MaterialFactory.getWaterMaterial();
+        return MaterialFactory.getWaterMaterial(materialParams);
       case 'metal':
         return new THREE.MeshStandardMaterial({
           color: 0x3a3a3a,

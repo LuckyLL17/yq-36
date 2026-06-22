@@ -192,6 +192,28 @@ export const DEFAULT_MOAT_WATER_PARAMS: MoatWaterParams = {
   isAnimated: true,
 };
 
+export interface MaterialParams {
+  agingLevel: number;
+  mossCoverage: number;
+  stoneCrackLevel: number;
+  stoneStainLevel: number;
+  woodGrainLevel: number;
+  woodRingLevel: number;
+  waterRippleLevel: number;
+  waterClarity: number;
+}
+
+export const DEFAULT_MATERIAL_PARAMS: MaterialParams = {
+  agingLevel: 0.5,
+  mossCoverage: 0.3,
+  stoneCrackLevel: 0.4,
+  stoneStainLevel: 0.3,
+  woodGrainLevel: 0.6,
+  woodRingLevel: 0.5,
+  waterRippleLevel: 0.5,
+  waterClarity: 0.7,
+};
+
 export const NPC_TYPE_INFO: Record<NPCType, { name: string; icon: string; description: string; color: string }> = {
   farmer: {
     name: '农民',
@@ -393,6 +415,7 @@ export interface CastleParams {
   barLatchPosition: number;
   buildingTypeDistribution: Record<BuildingType, number>;
   gateAnimationSync: boolean;
+  materialParams: MaterialParams;
 }
 
 export interface CastleMeshData {
@@ -526,4 +549,6 @@ export interface CastleState {
   closeGateSequence: () => void;
   setUVMappingMode: (mode: UVMappingMode) => void;
   toggleShowSeams: () => void;
+  setMaterialParams: (params: Partial<MaterialParams>) => void;
+  resetMaterialParams: () => void;
 }

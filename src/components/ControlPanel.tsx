@@ -1,4 +1,4 @@
-import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock, Users, Layers, ChevronDown, ChevronUp, Anchor, Waves, TrendingUp, Castle as CastleIcon, Lock, Unlink, Link2 } from 'lucide-react';
+import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock, Users, Layers, ChevronDown, ChevronUp, Anchor, Waves, TrendingUp, Castle as CastleIcon, Lock, Unlink, Link2, TreeDeciduous, Droplet, Scissors, Fan, Leaf, RotateCcw } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { CollapsibleSection } from './CollapsibleSection';
 import { SliderControl } from './SliderControl';
@@ -38,6 +38,8 @@ export function ControlPanel() {
     toggleGateAnimationSync,
     openGateSequence,
     closeGateSequence,
+    setMaterialParams,
+    resetMaterialParams,
   } = useCastleStore();
 
   return (
@@ -963,6 +965,126 @@ export function ControlPanel() {
               </div>
             </>
           )}
+        </CollapsibleSection>
+
+        <CollapsibleSection title="材质效果" icon={<Palette className="w-4 h-4" />} defaultOpen>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-stone-400">调整材质细节与老化程度</p>
+            <button
+              onClick={resetMaterialParams}
+              className="flex items-center gap-1 px-2 py-1 bg-stone-700/50 hover:bg-stone-600/50 border border-stone-600 rounded text-[10px] text-stone-300 transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" />
+              重置
+            </button>
+          </div>
+
+          <div className="p-2 bg-amber-900/20 rounded-lg border border-amber-800/30 mb-3">
+            <p className="text-xs text-amber-300 font-medium mb-2 flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" />
+              全局老化程度
+            </p>
+            <SliderControl
+              label="材质老化"
+              value={params.materialParams.agingLevel}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v) => setMaterialParams({ agingLevel: v })}
+              format={(v) => `${Math.round(v * 100)}%`}
+            />
+          </div>
+
+          <div className="p-2 bg-emerald-900/20 rounded-lg border border-emerald-800/30 mb-3">
+            <p className="text-xs text-emerald-300 font-medium mb-2 flex items-center gap-1.5">
+              <Leaf className="w-3.5 h-3.5" />
+              苔藓覆盖
+            </p>
+            <SliderControl
+              label="苔藓密度"
+              value={params.materialParams.mossCoverage}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v) => setMaterialParams({ mossCoverage: v })}
+              format={(v) => `${Math.round(v * 100)}%`}
+            />
+          </div>
+
+          <div className="p-2 bg-stone-700/30 rounded-lg border border-stone-600/30 mb-3">
+            <p className="text-xs text-stone-300 font-medium mb-2 flex items-center gap-1.5">
+              <CastleIcon className="w-3.5 h-3.5" />
+              石头材质
+            </p>
+            <SliderControl
+              label="裂缝程度"
+              value={params.materialParams.stoneCrackLevel}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v) => setMaterialParams({ stoneCrackLevel: v })}
+              format={(v) => `${Math.round(v * 100)}%`}
+            />
+            <SliderControl
+              label="污渍程度"
+              value={params.materialParams.stoneStainLevel}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v) => setMaterialParams({ stoneStainLevel: v })}
+              format={(v) => `${Math.round(v * 100)}%`}
+            />
+          </div>
+
+          <div className="p-2 bg-amber-900/20 rounded-lg border border-amber-800/30 mb-3">
+            <p className="text-xs text-amber-300 font-medium mb-2 flex items-center gap-1.5">
+              <TreeDeciduous className="w-3.5 h-3.5" />
+              木头材质
+            </p>
+            <SliderControl
+              label="木纹清晰度"
+              value={params.materialParams.woodGrainLevel}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v) => setMaterialParams({ woodGrainLevel: v })}
+              format={(v) => `${Math.round(v * 100)}%`}
+            />
+            <SliderControl
+              label="年轮明显度"
+              value={params.materialParams.woodRingLevel}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v) => setMaterialParams({ woodRingLevel: v })}
+              format={(v) => `${Math.round(v * 100)}%`}
+            />
+          </div>
+
+          <div className="p-2 bg-sky-900/20 rounded-lg border border-sky-800/30">
+            <p className="text-xs text-sky-300 font-medium mb-2 flex items-center gap-1.5">
+              <Droplets className="w-3.5 h-3.5" />
+              水面材质
+            </p>
+            <SliderControl
+              label="波纹强度"
+              value={params.materialParams.waterRippleLevel}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v) => setMaterialParams({ waterRippleLevel: v })}
+              format={(v) => `${Math.round(v * 100)}%`}
+            />
+            <SliderControl
+              label="水体清澈度"
+              value={params.materialParams.waterClarity}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v) => setMaterialParams({ waterClarity: v })}
+              format={(v) => `${Math.round(v * 100)}%`}
+            />
+          </div>
         </CollapsibleSection>
 
         <CollapsibleSection title="随机种子" icon={<Hash className="w-4 h-4" />} defaultOpen={false}>
