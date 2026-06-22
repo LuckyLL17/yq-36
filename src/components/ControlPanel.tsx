@@ -1,9 +1,59 @@
-import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock, Users, Layers, ChevronDown, ChevronUp, Anchor, Waves, TrendingUp, Castle as CastleIcon, Lock, Unlink, Link2, TreeDeciduous, Droplet, Scissors, Fan, Leaf, RotateCcw } from 'lucide-react';
+import { useState } from 'react';
+import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock, Users, Layers, ChevronDown, ChevronUp, Anchor, Waves, TrendingUp, Castle as CastleIcon, Lock, Unlock, Unlink, Link2, TreeDeciduous, Droplet, Scissors, Fan, Leaf, RotateCcw, Shuffle, Eye, Settings } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { CollapsibleSection } from './CollapsibleSection';
 import { SliderControl } from './SliderControl';
 import { ToggleControl } from './ToggleControl';
-import { TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, NPC_TYPE_INFO, NPCType, WallStyle, WALL_STYLE_PRESETS, TowerType, TOWER_TYPE_INFO, MoatSegment, BuildingType, BUILDING_TYPE_INFO } from '@/types/castle';
+import { PanelSettingsDialog } from './PanelSettingsDialog';
+import { cn } from '@/lib/utils';
+import { TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, NPC_TYPE_INFO, NPCType, WallStyle, WALL_STYLE_PRESETS, TowerType, TOWER_TYPE_INFO, MoatSegment, BuildingType, BUILDING_TYPE_INFO, PanelGroupId } from '@/types/castle';
+
+const GROUP_PARAMS: Record<PanelGroupId, string[]> = {
+  terrain: ['terrainType', 'terrainAmplitude', 'terrainFrequency', 'terrainScale'],
+  weather: ['weather', 'timeOfDay'],
+  wallStyle: ['wallStyle'],
+  plot: ['plotWidth', 'plotDepth'],
+  walls: ['wallHeight', 'wallThickness'],
+  towers: ['towerType', 'towerCount', 'towerHeight', 'towerRadius',
+    'towerSpecificParams.squareFort.crenellationHeight',
+    'towerSpecificParams.squareFort.buttressCount',
+    'towerSpecificParams.squareFort.windowRows',
+    'towerSpecificParams.polygonTower.sides',
+    'towerSpecificParams.polygonTower.pinnacleCount',
+    'towerSpecificParams.polygonTower.turretHeight',
+    'towerSpecificParams.spiralStair.stairWidth',
+    'towerSpecificParams.spiralStair.stairTurns',
+    'towerSpecificParams.spiralStair.centralColumnRadius',
+    'towerSpecificParams.gatehouse.archWidth',
+    'towerSpecificParams.gatehouse.archHeight',
+    'towerSpecificParams.gatehouse.towerSpacing',
+    'towerSpecificParams.gatehouse.gatehouseDepth',
+    'towerSpecificParams.gatehouse.hasBattlements',
+    'towerSpecificParams.gatehouse.hasMurderHoles',
+    'towerSpecificParams.gatehouse.hasBarbican'],
+  gates: ['gateWidth', 'gateHeight', 'hasGatehouse', 'hasBarLatch', 'barLatchPosition', 'gateAnimationSync'],
+  moat: ['hasMoat', 'moatWidth', 'moatDepth', 'hasDrawbridge', 'drawbridgeAngle',
+    'hasPortcullis', 'portcullisPosition',
+    'moatWaterParams.globalWaterLevel',
+    'moatWaterParams.waveHeight',
+    'moatWaterParams.flowSpeed',
+    'moatWaterParams.isAnimated'],
+  buildings: ['buildingHeight', 'buildingTypeDistribution.main_keep',
+    'buildingTypeDistribution.great_hall',
+    'buildingTypeDistribution.chapel',
+    'buildingTypeDistribution.stable',
+    'buildingTypeDistribution.barracks'],
+  residents: ['residentMode', 'residentCount', 'farmerRatio', 'soldierRatio', 'nobleRatio'],
+  materials: ['materialParams.agingLevel',
+    'materialParams.mossCoverage',
+    'materialParams.stoneCrackLevel',
+    'materialParams.stoneStainLevel',
+    'materialParams.woodGrainLevel',
+    'materialParams.woodRingLevel',
+    'materialParams.waterRippleLevel',
+    'materialParams.waterClarity'],
+  seed: ['seed'],
+};
 
 function formatTime(hours: number): string {
   const h = Math.floor(hours);
@@ -21,6 +71,7 @@ function getTimeEmoji(hours: number): string {
 }
 
 export function ControlPanel() {
+  const [showPanelSettings, setShowPanelSettings] = useState(false);
   const {
     params,
     setParams,
@@ -40,7 +91,47 @@ export function ControlPanel() {
     closeGateSequence,
     setMaterialParams,
     resetMaterialParams,
+    lockedParams,
+    panelGroups,
+    toggleParamLock,
+    isParamLocked,
+    togglePanelGroup,
+    setPanelGroupVisible,
+    randomizeAllParams,
+    lockAllParams,
+    unlockAllParams,
   } = useCastleStore();
+
+  const isGroupLocked = (groupId: PanelGroupId): boolean => {
+    const params = GROUP_PARAMS[groupId];
+    return params.length > 0 && params.every(p => lockedParams.has(p));
+  };
+
+  const toggleGroupLock = (groupId: PanelGroupId) => {
+    const params = GROUP_PARAMS[groupId];
+    const allLocked = isGroupLocked(groupId);
+    params.forEach(p => {
+      if (allLocked && lockedParams.has(p)) {
+        toggleParamLock(p);
+      } else if (!allLocked && !lockedParams.has(p)) {
+        toggleParamLock(p);
+      }
+    });
+  };
+
+  const handleShowAllPanels = () => {
+    (Object.keys(panelGroups) as PanelGroupId[]).forEach(id => {
+      setPanelGroupVisible(id, true);
+    });
+  };
+
+  const handleHideAllPanels = () => {
+    (Object.keys(panelGroups) as PanelGroupId[]).forEach(id => {
+      setPanelGroupVisible(id, false);
+    });
+  };
+
+  const lockedCount = lockedParams.size;
 
   return (
     <div className="w-80 bg-stone-900/95 backdrop-blur-sm border-r border-amber-900/30 flex flex-col h-full">
@@ -58,23 +149,73 @@ export function ControlPanel() {
         </div>
       </div>
 
+      <div className="p-3 border-b border-amber-900/30 bg-stone-800/50">
+        <div className="flex gap-2">
+          <button
+            onClick={randomizeAllParams}
+            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-amber-600 hover:bg-amber-500 rounded-lg text-white text-xs font-medium transition-colors"
+            title="一键随机所有未锁定的参数"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+            随机化
+          </button>
+          <button
+            onClick={lockAllParams}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-stone-700 hover:bg-stone-600 rounded-lg text-stone-200 text-xs font-medium transition-colors"
+            title="锁定所有参数"
+          >
+            <Lock className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={unlockAllParams}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-stone-700 hover:bg-stone-600 rounded-lg text-stone-200 text-xs font-medium transition-colors"
+            title="解锁所有参数"
+          >
+            <Unlock className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setShowPanelSettings(true)}
+            className="flex items-center justify-center gap-1.5 px-3 py-2 bg-stone-700 hover:bg-stone-600 rounded-lg text-stone-200 text-xs font-medium transition-colors"
+            title="设置面板显示"
+          >
+            <Eye className="w-3.5 h-3.5" />
+          </button>
+        </div>
+        {lockedCount > 0 && (
+          <div className="mt-2 flex items-center justify-center gap-1.5 text-[10px] text-amber-400">
+            <Lock className="w-3 h-3" />
+            <span>已锁定 {lockedCount} 个参数</span>
+          </div>
+        )}
+      </div>
+
       <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-stone-600 scrollbar-track-stone-800">
-        <CollapsibleSection title="地形设置" icon={<Mountain className="w-4 h-4" />}>
+        {panelGroups.terrain && (
+        <CollapsibleSection
+          title="地形设置"
+          icon={<Mountain className="w-4 h-4" />}
+          locked={isGroupLocked('terrain')}
+          onToggleLock={() => toggleGroupLock('terrain')}
+        >
           <div className="space-y-2 mb-3">
             <p className="text-xs text-stone-400">选择地形类型</p>
             <div className="grid grid-cols-3 gap-2">
               {(Object.keys(TERRAIN_PRESETS) as TerrainType[]).map((type) => {
                 const preset = TERRAIN_PRESETS[type];
                 const isSelected = params.terrainType === type;
+                const locked = isParamLocked('terrainType');
                 return (
                   <button
                     key={type}
-                    onClick={() => applyTerrainType(type)}
-                    className={`p-2 rounded-lg border transition-all text-center ${
+                    onClick={() => !locked && applyTerrainType(type)}
+                    disabled={locked}
+                    className={cn(
+                      'p-2 rounded-lg border transition-all text-center',
+                      locked ? 'opacity-50 cursor-not-allowed' : '',
                       isSelected
                         ? 'bg-amber-600/30 border-amber-500 ring-1 ring-amber-500'
                         : 'bg-stone-800/50 border-stone-700 hover:bg-stone-700/50 hover:border-stone-600'
-                    }`}
+                    )}
                   >
                     <div className="text-lg mb-0.5">{preset.icon}</div>
                     <div className={`text-xs font-medium ${isSelected ? 'text-amber-300' : 'text-stone-300'}`}>
@@ -96,6 +237,9 @@ export function ControlPanel() {
             step={0.2}
             onChange={(v) => setParams({ terrainAmplitude: v })}
             unit="m"
+            locked={isParamLocked('terrainAmplitude')}
+            paramKey="terrainAmplitude"
+            onToggleLock={toggleParamLock}
           />
           <SliderControl
             label="地形频率"
@@ -104,6 +248,9 @@ export function ControlPanel() {
             max={6}
             step={0.1}
             onChange={(v) => setParams({ terrainFrequency: v })}
+            locked={isParamLocked('terrainFrequency')}
+            paramKey="terrainFrequency"
+            onToggleLock={toggleParamLock}
           />
           <SliderControl
             label="地形粗糙度"
@@ -112,25 +259,39 @@ export function ControlPanel() {
             max={0.1}
             step={0.005}
             onChange={(v) => setParams({ terrainScale: v })}
+            locked={isParamLocked('terrainScale')}
+            paramKey="terrainScale"
+            onToggleLock={toggleParamLock}
           />
         </CollapsibleSection>
+        )}
 
-        <CollapsibleSection title="天气环境" icon={<CloudSun className="w-4 h-4" />}>
+        {panelGroups.weather && (
+        <CollapsibleSection
+          title="天气环境"
+          icon={<CloudSun className="w-4 h-4" />}
+          locked={isGroupLocked('weather')}
+          onToggleLock={() => toggleGroupLock('weather')}
+        >
           <div className="space-y-2 mb-3">
             <p className="text-xs text-stone-400">选择天气类型</p>
             <div className="grid grid-cols-4 gap-2">
               {(Object.keys(WEATHER_PRESETS) as WeatherType[]).map((type) => {
                 const preset = WEATHER_PRESETS[type];
                 const isSelected = params.weather === type;
+                const locked = isParamLocked('weather');
                 return (
                   <button
                     key={type}
-                    onClick={() => applyWeather(type)}
-                    className={`p-2 rounded-lg border transition-all text-center ${
+                    onClick={() => !locked && applyWeather(type)}
+                    disabled={locked}
+                    className={cn(
+                      'p-2 rounded-lg border transition-all text-center',
+                      locked ? 'opacity-50 cursor-not-allowed' : '',
                       isSelected
                         ? 'bg-sky-600/30 border-sky-500 ring-1 ring-sky-500'
                         : 'bg-stone-800/50 border-stone-700 hover:bg-stone-700/50 hover:border-stone-600'
-                    }`}
+                    )}
                   >
                     <div className="text-lg mb-0.5">{preset.icon}</div>
                     <div className={`text-xs font-medium ${isSelected ? 'text-sky-300' : 'text-stone-300'}`}>
@@ -146,10 +307,27 @@ export function ControlPanel() {
           </div>
           <div className="space-y-1.5 mb-3">
             <div className="flex justify-between items-center text-xs">
-              <label className="text-stone-400 font-medium flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" />
-                时间滑块
-              </label>
+              <div className="flex items-center gap-1.5">
+                <label className={cn(
+                  "font-medium flex items-center gap-1.5",
+                  isParamLocked('timeOfDay') ? "text-stone-500" : "text-stone-400"
+                )}>
+                  <Clock className="w-3.5 h-3.5" />
+                  时间滑块
+                </label>
+                <button
+                  onClick={() => toggleParamLock('timeOfDay')}
+                  className={cn(
+                    "p-0.5 rounded transition-colors",
+                    isParamLocked('timeOfDay')
+                      ? "text-amber-500"
+                      : "text-stone-600 hover:text-stone-400"
+                  )}
+                  title={isParamLocked('timeOfDay') ? "解锁参数" : "锁定参数"}
+                >
+                  {isParamLocked('timeOfDay') ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                </button>
+              </div>
               <span className="text-amber-500 font-mono tabular-nums">
                 {getTimeEmoji(params.timeOfDay)} {formatTime(params.timeOfDay)}
               </span>
@@ -163,26 +341,29 @@ export function ControlPanel() {
                   max={24}
                   step={0.1}
                   value={params.timeOfDay}
-                  onChange={(e) => setTimeOfDay(parseFloat(e.target.value))}
-                  className="w-full h-2 rounded-full appearance-none cursor-pointer
-                    [&::-webkit-slider-thumb]:appearance-none
-                    [&::-webkit-slider-thumb]:w-4
-                    [&::-webkit-slider-thumb]:h-4
-                    [&::-webkit-slider-thumb]:rounded-full
-                    [&::-webkit-slider-thumb]:bg-amber-500
-                    [&::-webkit-slider-thumb]:cursor-pointer
-                    [&::-webkit-slider-thumb]:shadow-lg
-                    [&::-webkit-slider-thumb]:shadow-amber-500/30
-                    [&::-webkit-slider-thumb]:transition-transform
-                    [&::-webkit-slider-thumb]:hover:scale-110
-                    [&::-moz-range-thumb]:w-4
-                    [&::-moz-range-thumb]:h-4
-                    [&::-moz-range-thumb]:rounded-full
-                    [&::-moz-range-thumb]:bg-amber-500
-                    [&::-moz-range-thumb]:border-none
-                    [&::-moz-range-thumb]:cursor-pointer"
+                  onChange={(e) => !isParamLocked('timeOfDay') && setTimeOfDay(parseFloat(e.target.value))}
+                  disabled={isParamLocked('timeOfDay')}
+                  className={cn(
+                    "w-full h-2 rounded-full appearance-none",
+                    isParamLocked('timeOfDay') ? "cursor-not-allowed" : "cursor-pointer",
+                    "[&::-webkit-slider-thumb]:appearance-none",
+                    "[&::-webkit-slider-thumb]:w-4",
+                    "[&::-webkit-slider-thumb]:h-4",
+                    "[&::-webkit-slider-thumb]:rounded-full",
+                    "[&::-webkit-slider-thumb]:bg-amber-500",
+                    "[&::-webkit-slider-thumb]:shadow-lg",
+                    "[&::-webkit-slider-thumb]:shadow-amber-500/30",
+                    "[&::-webkit-slider-thumb]:transition-transform",
+                    !isParamLocked('timeOfDay') && "[&::-webkit-slider-thumb]:hover:scale-110",
+                    "[&::-moz-range-thumb]:w-4",
+                    "[&::-moz-range-thumb]:h-4",
+                    "[&::-moz-range-thumb]:rounded-full",
+                    "[&::-moz-range-thumb]:bg-amber-500",
+                    "[&::-moz-range-thumb]:border-none"
+                  )}
                   style={{
                     background: `linear-gradient(to right, #312e81 0%, #f97316 25%, #fcd34d 50%, #f97316 75%, #312e81 100%)`,
+                    opacity: isParamLocked('timeOfDay') ? 0.5 : 1,
                   }}
                 />
               </div>
@@ -205,12 +386,15 @@ export function ControlPanel() {
             ].map((preset) => (
               <button
                 key={preset.label}
-                onClick={() => setTimeOfDay(preset.value)}
-                className={`px-2 py-1.5 rounded border text-xs transition-all ${
+                onClick={() => !isParamLocked('timeOfDay') && setTimeOfDay(preset.value)}
+                disabled={isParamLocked('timeOfDay')}
+                className={cn(
+                  'px-2 py-1.5 rounded border text-xs transition-all',
+                  isParamLocked('timeOfDay') ? 'opacity-50 cursor-not-allowed' : '',
                   Math.abs(params.timeOfDay - preset.value) < 0.5
                     ? 'bg-amber-600/30 border-amber-500 text-amber-300'
                     : 'bg-stone-800/50 border-stone-700 text-stone-400 hover:bg-stone-700/50 hover:border-stone-600 hover:text-stone-300'
-                }`}
+                )}
               >
                 <div className="text-sm">{preset.emoji}</div>
                 <div className="text-[10px]">{preset.label}</div>
@@ -218,23 +402,34 @@ export function ControlPanel() {
             ))}
           </div>
         </CollapsibleSection>
+        )}
 
-        <CollapsibleSection title="城墙风格" icon={<Layers className="w-4 h-4" />}>
+        {panelGroups.wallStyle && (
+        <CollapsibleSection
+          title="城墙风格"
+          icon={<Layers className="w-4 h-4" />}
+          locked={isGroupLocked('wallStyle')}
+          onToggleLock={() => toggleGroupLock('wallStyle')}
+        >
           <div className="space-y-2 mb-3">
             <p className="text-xs text-stone-400">选择城墙建筑风格</p>
             <div className="grid grid-cols-3 gap-2">
               {(Object.keys(WALL_STYLE_PRESETS) as WallStyle[]).map((style) => {
                 const preset = WALL_STYLE_PRESETS[style];
                 const isSelected = params.wallStyle === style;
+                const locked = isParamLocked('wallStyle');
                 return (
                   <button
                     key={style}
-                    onClick={() => applyWallStyle(style)}
-                    className={`p-2 rounded-lg border transition-all text-center ${
+                    onClick={() => !locked && applyWallStyle(style)}
+                    disabled={locked}
+                    className={cn(
+                      'p-2 rounded-lg border transition-all text-center',
+                      locked ? 'opacity-50 cursor-not-allowed' : '',
                       isSelected
                         ? 'bg-amber-600/30 border-amber-500 ring-1 ring-amber-500'
                         : 'bg-stone-800/50 border-stone-700 hover:bg-stone-700/50 hover:border-stone-600'
-                    }`}
+                    )}
                   >
                     <div className="text-lg mb-0.5">{preset.icon}</div>
                     <div className={`text-xs font-medium ${isSelected ? 'text-amber-300' : 'text-stone-300'}`}>
@@ -249,8 +444,15 @@ export function ControlPanel() {
             </p>
           </div>
         </CollapsibleSection>
+        )}
 
-        <CollapsibleSection title="地块设置" icon={<Shield className="w-4 h-4" />}>
+        {panelGroups.plot && (
+        <CollapsibleSection
+          title="地块设置"
+          icon={<Shield className="w-4 h-4" />}
+          locked={isGroupLocked('plot')}
+          onToggleLock={() => toggleGroupLock('plot')}
+        >
           <SliderControl
             label="地块宽度"
             value={params.plotWidth}
@@ -259,6 +461,9 @@ export function ControlPanel() {
             step={1}
             onChange={(v) => setParams({ plotWidth: v })}
             unit="m"
+            locked={isParamLocked('plotWidth')}
+            paramKey="plotWidth"
+            onToggleLock={toggleParamLock}
           />
           <SliderControl
             label="地块深度"
@@ -268,10 +473,20 @@ export function ControlPanel() {
             step={1}
             onChange={(v) => setParams({ plotDepth: v })}
             unit="m"
+            locked={isParamLocked('plotDepth')}
+            paramKey="plotDepth"
+            onToggleLock={toggleParamLock}
           />
         </CollapsibleSection>
+        )}
 
-        <CollapsibleSection title="城墙设置" icon={<Building2 className="w-4 h-4" />}>
+        {panelGroups.walls && (
+        <CollapsibleSection
+          title="城墙设置"
+          icon={<Building2 className="w-4 h-4" />}
+          locked={isGroupLocked('walls')}
+          onToggleLock={() => toggleGroupLock('walls')}
+        >
           <SliderControl
             label="城墙高度"
             value={params.wallHeight}
@@ -280,6 +495,9 @@ export function ControlPanel() {
             step={0.5}
             onChange={(v) => setParams({ wallHeight: v })}
             unit="m"
+            locked={isParamLocked('wallHeight')}
+            paramKey="wallHeight"
+            onToggleLock={toggleParamLock}
           />
           <SliderControl
             label="城墙厚度"
@@ -289,25 +507,40 @@ export function ControlPanel() {
             step={0.5}
             onChange={(v) => setParams({ wallThickness: v })}
             unit="m"
+            locked={isParamLocked('wallThickness')}
+            paramKey="wallThickness"
+            onToggleLock={toggleParamLock}
           />
         </CollapsibleSection>
+        )}
 
-        <CollapsibleSection title="塔楼设置" icon={<Castle className="w-4 h-4" />} defaultOpen>
+        {panelGroups.towers && (
+        <CollapsibleSection
+          title="塔楼设置"
+          icon={<Castle className="w-4 h-4" />}
+          defaultOpen
+          locked={isGroupLocked('towers')}
+          onToggleLock={() => toggleGroupLock('towers')}
+        >
           <div className="space-y-2 mb-3">
             <p className="text-xs text-stone-400">选择塔楼类型</p>
             <div className="grid grid-cols-5 gap-1.5">
               {(Object.keys(TOWER_TYPE_INFO) as TowerType[]).map((type) => {
                 const info = TOWER_TYPE_INFO[type];
                 const isSelected = params.towerType === type;
+                const locked = isParamLocked('towerType');
                 return (
                   <button
                     key={type}
-                    onClick={() => applyTowerType(type)}
-                    className={`p-1.5 rounded-lg border transition-all text-center ${
+                    onClick={() => !locked && applyTowerType(type)}
+                    disabled={locked}
+                    className={cn(
+                      'p-1.5 rounded-lg border transition-all text-center',
+                      locked ? 'opacity-50 cursor-not-allowed' : '',
                       isSelected
                         ? 'bg-purple-600/30 border-purple-500 ring-1 ring-purple-500'
                         : 'bg-stone-800/50 border-stone-700 hover:bg-stone-700/50 hover:border-stone-600'
-                    }`}
+                    )}
                     title={info.description}
                   >
                     <div className="text-base mb-0.5">{info.icon}</div>
@@ -331,6 +564,9 @@ export function ControlPanel() {
             step={1}
             onChange={(v) => setParams({ towerCount: v })}
             unit="座"
+            locked={isParamLocked('towerCount')}
+            paramKey="towerCount"
+            onToggleLock={toggleParamLock}
           />
           <SliderControl
             label="塔楼高度"
@@ -340,6 +576,9 @@ export function ControlPanel() {
             step={1}
             onChange={(v) => setParams({ towerHeight: v })}
             unit="m"
+            locked={isParamLocked('towerHeight')}
+            paramKey="towerHeight"
+            onToggleLock={toggleParamLock}
           />
           <SliderControl
             label="塔楼半径"
@@ -349,6 +588,9 @@ export function ControlPanel() {
             step={0.5}
             onChange={(v) => setParams({ towerRadius: v })}
             unit="m"
+            locked={isParamLocked('towerRadius')}
+            paramKey="towerRadius"
+            onToggleLock={toggleParamLock}
           />
 
           {params.towerType === 'square_fort' && (
@@ -362,6 +604,9 @@ export function ControlPanel() {
                 step={0.1}
                 onChange={(v) => updateTowerSpecificParams('squareFort', { crenellationHeight: v })}
                 unit="m"
+                locked={isParamLocked('towerSpecificParams.squareFort.crenellationHeight')}
+                paramKey="towerSpecificParams.squareFort.crenellationHeight"
+                onToggleLock={toggleParamLock}
               />
               <SliderControl
                 label="扶壁数量"
@@ -371,6 +616,9 @@ export function ControlPanel() {
                 step={1}
                 onChange={(v) => updateTowerSpecificParams('squareFort', { buttressCount: v })}
                 unit="个"
+                locked={isParamLocked('towerSpecificParams.squareFort.buttressCount')}
+                paramKey="towerSpecificParams.squareFort.buttressCount"
+                onToggleLock={toggleParamLock}
               />
               <SliderControl
                 label="窗户排数"
@@ -380,6 +628,9 @@ export function ControlPanel() {
                 step={1}
                 onChange={(v) => updateTowerSpecificParams('squareFort', { windowRows: v })}
                 unit="排"
+                locked={isParamLocked('towerSpecificParams.squareFort.windowRows')}
+                paramKey="towerSpecificParams.squareFort.windowRows"
+                onToggleLock={toggleParamLock}
               />
             </div>
           )}
@@ -395,6 +646,9 @@ export function ControlPanel() {
                 step={1}
                 onChange={(v) => updateTowerSpecificParams('polygonTower', { sides: v })}
                 unit="边"
+                locked={isParamLocked('towerSpecificParams.polygonTower.sides')}
+                paramKey="towerSpecificParams.polygonTower.sides"
+                onToggleLock={toggleParamLock}
               />
               <SliderControl
                 label="小尖塔数"
@@ -404,6 +658,9 @@ export function ControlPanel() {
                 step={1}
                 onChange={(v) => updateTowerSpecificParams('polygonTower', { pinnacleCount: v })}
                 unit="座"
+                locked={isParamLocked('towerSpecificParams.polygonTower.pinnacleCount')}
+                paramKey="towerSpecificParams.polygonTower.pinnacleCount"
+                onToggleLock={toggleParamLock}
               />
               <SliderControl
                 label="角楼高度"
@@ -413,6 +670,9 @@ export function ControlPanel() {
                 step={0.5}
                 onChange={(v) => updateTowerSpecificParams('polygonTower', { turretHeight: v })}
                 unit="m"
+                locked={isParamLocked('towerSpecificParams.polygonTower.turretHeight')}
+                paramKey="towerSpecificParams.polygonTower.turretHeight"
+                onToggleLock={toggleParamLock}
               />
             </div>
           )}
@@ -428,6 +688,9 @@ export function ControlPanel() {
                 step={0.1}
                 onChange={(v) => updateTowerSpecificParams('spiralStair', { stairWidth: v })}
                 unit="m"
+                locked={isParamLocked('towerSpecificParams.spiralStair.stairWidth')}
+                paramKey="towerSpecificParams.spiralStair.stairWidth"
+                onToggleLock={toggleParamLock}
               />
               <SliderControl
                 label="螺旋圈数"
@@ -437,6 +700,9 @@ export function ControlPanel() {
                 step={1}
                 onChange={(v) => updateTowerSpecificParams('spiralStair', { stairTurns: v })}
                 unit="圈"
+                locked={isParamLocked('towerSpecificParams.spiralStair.stairTurns')}
+                paramKey="towerSpecificParams.spiralStair.stairTurns"
+                onToggleLock={toggleParamLock}
               />
               <SliderControl
                 label="中心柱半径"
@@ -446,6 +712,9 @@ export function ControlPanel() {
                 step={0.1}
                 onChange={(v) => updateTowerSpecificParams('spiralStair', { centralColumnRadius: v })}
                 unit="m"
+                locked={isParamLocked('towerSpecificParams.spiralStair.centralColumnRadius')}
+                paramKey="towerSpecificParams.spiralStair.centralColumnRadius"
+                onToggleLock={toggleParamLock}
               />
             </div>
           )}
@@ -461,6 +730,9 @@ export function ControlPanel() {
                 step={0.5}
                 onChange={(v) => updateTowerSpecificParams('gatehouse', { archWidth: v })}
                 unit="m"
+                locked={isParamLocked('towerSpecificParams.gatehouse.archWidth')}
+                paramKey="towerSpecificParams.gatehouse.archWidth"
+                onToggleLock={toggleParamLock}
               />
               <SliderControl
                 label="拱门高度"
@@ -470,6 +742,9 @@ export function ControlPanel() {
                 step={0.5}
                 onChange={(v) => updateTowerSpecificParams('gatehouse', { archHeight: v })}
                 unit="m"
+                locked={isParamLocked('towerSpecificParams.gatehouse.archHeight')}
+                paramKey="towerSpecificParams.gatehouse.archHeight"
+                onToggleLock={toggleParamLock}
               />
               <SliderControl
                 label="双塔间距"
@@ -479,12 +754,22 @@ export function ControlPanel() {
                 step={0.5}
                 onChange={(v) => updateTowerSpecificParams('gatehouse', { towerSpacing: v })}
                 unit="m"
+                locked={isParamLocked('towerSpecificParams.gatehouse.towerSpacing')}
+                paramKey="towerSpecificParams.gatehouse.towerSpacing"
+                onToggleLock={toggleParamLock}
               />
             </div>
           )}
         </CollapsibleSection>
+        )}
 
-        <CollapsibleSection title="城门设置" icon={<DoorOpen className="w-4 h-4" />}>
+        {panelGroups.gates && (
+        <CollapsibleSection
+          title="城门设置"
+          icon={<DoorOpen className="w-4 h-4" />}
+          locked={isGroupLocked('gates')}
+          onToggleLock={() => toggleGroupLock('gates')}
+        >
           <SliderControl
             label="城门宽度"
             value={params.gateWidth}
@@ -493,6 +778,9 @@ export function ControlPanel() {
             step={0.5}
             onChange={(v) => setParams({ gateWidth: v })}
             unit="m"
+            locked={isParamLocked('gateWidth')}
+            paramKey="gateWidth"
+            onToggleLock={toggleParamLock}
           />
           <SliderControl
             label="城门高度"
@@ -502,12 +790,18 @@ export function ControlPanel() {
             step={0.5}
             onChange={(v) => setParams({ gateHeight: v })}
             unit="m"
+            locked={isParamLocked('gateHeight')}
+            paramKey="gateHeight"
+            onToggleLock={toggleParamLock}
           />
           <div className="mt-3 pt-3 border-t border-stone-700/50">
             <ToggleControl
               label="启用门楼结构"
               checked={params.hasGatehouse}
               onChange={(v) => setParams({ hasGatehouse: v })}
+              locked={isParamLocked('hasGatehouse')}
+              paramKey="hasGatehouse"
+              onToggleLock={toggleParamLock}
             />
           </div>
           {params.hasGatehouse && params.towerType === 'gatehouse' && (
@@ -521,21 +815,33 @@ export function ControlPanel() {
                 step={0.5}
                 onChange={(v) => updateTowerSpecificParams('gatehouse', { gatehouseDepth: v })}
                 unit="m"
+                locked={isParamLocked('towerSpecificParams.gatehouse.gatehouseDepth')}
+                paramKey="towerSpecificParams.gatehouse.gatehouseDepth"
+                onToggleLock={toggleParamLock}
               />
               <ToggleControl
                 label="顶部城垛"
                 checked={params.towerSpecificParams.gatehouse.hasBattlements}
                 onChange={(v) => updateTowerSpecificParams('gatehouse', { hasBattlements: v })}
+                locked={isParamLocked('towerSpecificParams.gatehouse.hasBattlements')}
+                paramKey="towerSpecificParams.gatehouse.hasBattlements"
+                onToggleLock={toggleParamLock}
               />
               <ToggleControl
                 label="谋杀洞"
                 checked={params.towerSpecificParams.gatehouse.hasMurderHoles}
                 onChange={(v) => updateTowerSpecificParams('gatehouse', { hasMurderHoles: v })}
+                locked={isParamLocked('towerSpecificParams.gatehouse.hasMurderHoles')}
+                paramKey="towerSpecificParams.gatehouse.hasMurderHoles"
+                onToggleLock={toggleParamLock}
               />
               <ToggleControl
                 label="外堡 (Barbican)"
                 checked={params.towerSpecificParams.gatehouse.hasBarbican}
                 onChange={(v) => updateTowerSpecificParams('gatehouse', { hasBarbican: v })}
+                locked={isParamLocked('towerSpecificParams.gatehouse.hasBarbican')}
+                paramKey="towerSpecificParams.gatehouse.hasBarbican"
+                onToggleLock={toggleParamLock}
               />
             </div>
           )}
@@ -544,12 +850,34 @@ export function ControlPanel() {
               label="门后闩锁"
               checked={params.hasBarLatch}
               onChange={(v) => setParams({ hasBarLatch: v })}
+              locked={isParamLocked('hasBarLatch')}
+              paramKey="hasBarLatch"
+              onToggleLock={toggleParamLock}
             />
           </div>
           {params.hasBarLatch && (
             <div className="mt-2">
               <div className="flex justify-between items-center text-xs mb-1">
-                <label className="text-stone-300">闩锁位置</label>
+                <div className="flex items-center gap-1.5">
+                  <label className={cn(
+                    "font-medium",
+                    isParamLocked('barLatchPosition') ? "text-stone-500" : "text-stone-300"
+                  )}>
+                    闩锁位置
+                  </label>
+                  <button
+                    onClick={() => toggleParamLock('barLatchPosition')}
+                    className={cn(
+                      "p-0.5 rounded transition-colors",
+                      isParamLocked('barLatchPosition')
+                        ? "text-amber-500"
+                        : "text-stone-600 hover:text-stone-400"
+                    )}
+                    title={isParamLocked('barLatchPosition') ? "解锁参数" : "锁定参数"}
+                  >
+                    {isParamLocked('barLatchPosition') ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                  </button>
+                </div>
                 <span className="text-amber-400 font-mono">{Math.round(params.barLatchPosition * 100)}%</span>
               </div>
               <input
@@ -558,16 +886,29 @@ export function ControlPanel() {
                 max={1}
                 step={0.02}
                 value={params.barLatchPosition}
-                onChange={(e) => setBarLatchPosition(parseFloat(e.target.value))}
-                className="w-full h-2 rounded-full appearance-none cursor-pointer
-                  [&::-webkit-slider-thumb]:appearance-none
-                  [&::-webkit-slider-thumb]:w-4
-                  [&::-webkit-slider-thumb]:h-4
-                  [&::-webkit-slider-thumb]:rounded-full
-                  [&::-webkit-slider-thumb]:bg-amber-500
-                  [&::-webkit-slider-thumb]:cursor-pointer"
+                onChange={(e) => !isParamLocked('barLatchPosition') && setBarLatchPosition(parseFloat(e.target.value))}
+                disabled={isParamLocked('barLatchPosition')}
+                className={cn(
+                  "w-full h-2 rounded-full appearance-none",
+                  isParamLocked('barLatchPosition') ? "cursor-not-allowed" : "cursor-pointer",
+                  "[&::-webkit-slider-thumb]:appearance-none",
+                  "[&::-webkit-slider-thumb]:w-4",
+                  "[&::-webkit-slider-thumb]:h-4",
+                  "[&::-webkit-slider-thumb]:rounded-full",
+                  "[&::-webkit-slider-thumb]:bg-amber-500",
+                  "[&::-webkit-slider-thumb]:shadow-lg",
+                  "[&::-webkit-slider-thumb]:shadow-amber-500/30",
+                  "[&::-webkit-slider-thumb]:transition-transform",
+                  !isParamLocked('barLatchPosition') && "[&::-webkit-slider-thumb]:hover:scale-110",
+                  "[&::-moz-range-thumb]:w-4",
+                  "[&::-moz-range-thumb]:h-4",
+                  "[&::-moz-range-thumb]:rounded-full",
+                  "[&::-moz-range-thumb]:bg-amber-500",
+                  "[&::-moz-range-thumb]:border-none"
+                )}
                 style={{
                   background: `linear-gradient(to right, #78350f 0%, #f59e0b ${params.barLatchPosition * 100}%, #78716c ${params.barLatchPosition * 100}%, #57534e 100%)`,
+                  opacity: isParamLocked('barLatchPosition') ? 0.5 : 1,
                 }}
               />
             </div>
@@ -576,15 +917,37 @@ export function ControlPanel() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <Link2 className="w-3.5 h-3.5 text-teal-400" />
-                <span className="text-xs text-stone-300">联动动画</span>
+                <div className="flex items-center gap-1.5">
+                  <label className={cn(
+                    "text-xs font-medium",
+                    isParamLocked('gateAnimationSync') ? "text-stone-500" : "text-stone-300"
+                  )}>
+                    联动动画
+                  </label>
+                  <button
+                    onClick={() => toggleParamLock('gateAnimationSync')}
+                    className={cn(
+                      "p-0.5 rounded transition-colors",
+                      isParamLocked('gateAnimationSync')
+                        ? "text-amber-500"
+                        : "text-stone-600 hover:text-stone-400"
+                    )}
+                    title={isParamLocked('gateAnimationSync') ? "解锁参数" : "锁定参数"}
+                  >
+                    {isParamLocked('gateAnimationSync') ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                  </button>
+                </div>
               </div>
               <button
-                onClick={toggleGateAnimationSync}
-                className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                onClick={() => !isParamLocked('gateAnimationSync') && toggleGateAnimationSync()}
+                disabled={isParamLocked('gateAnimationSync')}
+                className={cn(
+                  "px-2 py-1 rounded text-[10px] font-medium transition-colors",
+                  isParamLocked('gateAnimationSync') ? 'opacity-50 cursor-not-allowed' : '',
                   params.gateAnimationSync
                     ? 'bg-teal-600/30 text-teal-300 border border-teal-500'
                     : 'bg-stone-700/50 text-stone-400 border border-stone-600'
-                }`}
+                )}
               >
                 {params.gateAnimationSync ? '已同步' : '未同步'}
               </button>
@@ -610,12 +973,23 @@ export function ControlPanel() {
             </p>
           </div>
         </CollapsibleSection>
+        )}
 
-        <CollapsibleSection title="护城河系统" icon={<Droplets className="w-4 h-4" />} defaultOpen>
+        {panelGroups.moat && (
+        <CollapsibleSection
+          title="护城河系统"
+          icon={<Droplets className="w-4 h-4" />}
+          defaultOpen
+          locked={isGroupLocked('moat')}
+          onToggleLock={() => toggleGroupLock('moat')}
+        >
           <ToggleControl
             label="启用护城河"
             checked={params.hasMoat}
             onChange={(v) => setParams({ hasMoat: v })}
+            locked={isParamLocked('hasMoat')}
+            paramKey="hasMoat"
+            onToggleLock={toggleParamLock}
           />
           {params.hasMoat && (
             <>
@@ -627,6 +1001,9 @@ export function ControlPanel() {
                 step={0.5}
                 onChange={(v) => setParams({ moatWidth: v })}
                 unit="m"
+                locked={isParamLocked('moatWidth')}
+                paramKey="moatWidth"
+                onToggleLock={toggleParamLock}
               />
               <SliderControl
                 label="护城河深度"
@@ -636,6 +1013,9 @@ export function ControlPanel() {
                 step={0.5}
                 onChange={(v) => setParams({ moatDepth: v })}
                 unit="m"
+                locked={isParamLocked('moatDepth')}
+                paramKey="moatDepth"
+                onToggleLock={toggleParamLock}
               />
 
               <div className="mt-3 p-2 bg-sky-900/20 rounded-lg border border-sky-800/30">
@@ -651,6 +1031,9 @@ export function ControlPanel() {
                   step={0.05}
                   onChange={(v) => setParams({ moatWaterParams: { ...params.moatWaterParams, globalWaterLevel: v } })}
                   format={(v) => `${Math.round(v * 100)}%`}
+                  locked={isParamLocked('moatWaterParams.globalWaterLevel')}
+                  paramKey="moatWaterParams.globalWaterLevel"
+                  onToggleLock={toggleParamLock}
                 />
                 <SliderControl
                   label="波浪高度"
@@ -660,6 +1043,9 @@ export function ControlPanel() {
                   step={0.02}
                   onChange={(v) => setParams({ moatWaterParams: { ...params.moatWaterParams, waveHeight: v } })}
                   unit="m"
+                  locked={isParamLocked('moatWaterParams.waveHeight')}
+                  paramKey="moatWaterParams.waveHeight"
+                  onToggleLock={toggleParamLock}
                 />
                 <SliderControl
                   label="水流速度"
@@ -668,11 +1054,17 @@ export function ControlPanel() {
                   max={3}
                   step={0.1}
                   onChange={(v) => setParams({ moatWaterParams: { ...params.moatWaterParams, flowSpeed: v } })}
+                  locked={isParamLocked('moatWaterParams.flowSpeed')}
+                  paramKey="moatWaterParams.flowSpeed"
+                  onToggleLock={toggleParamLock}
                 />
                 <ToggleControl
                   label="启用水面动画"
                   checked={params.moatWaterParams.isAnimated}
                   onChange={(v) => setParams({ moatWaterParams: { ...params.moatWaterParams, isAnimated: v } })}
+                  locked={isParamLocked('moatWaterParams.isAnimated')}
+                  paramKey="moatWaterParams.isAnimated"
+                  onToggleLock={toggleParamLock}
                 />
               </div>
 
@@ -685,11 +1077,33 @@ export function ControlPanel() {
                   label="启用塔桥"
                   checked={params.hasDrawbridge}
                   onChange={(v) => setParams({ hasDrawbridge: v })}
+                  locked={isParamLocked('hasDrawbridge')}
+                  paramKey="hasDrawbridge"
+                  onToggleLock={toggleParamLock}
                 />
                 {params.hasDrawbridge && (
                   <div className="mt-2">
                     <div className="flex justify-between items-center text-xs mb-1">
-                      <label className="text-stone-300">抬起角度</label>
+                      <div className="flex items-center gap-1.5">
+                        <label className={cn(
+                          "font-medium",
+                          isParamLocked('drawbridgeAngle') ? "text-stone-500" : "text-stone-300"
+                        )}>
+                          抬起角度
+                        </label>
+                        <button
+                          onClick={() => toggleParamLock('drawbridgeAngle')}
+                          className={cn(
+                            "p-0.5 rounded transition-colors",
+                            isParamLocked('drawbridgeAngle')
+                              ? "text-amber-500"
+                              : "text-stone-600 hover:text-stone-400"
+                          )}
+                          title={isParamLocked('drawbridgeAngle') ? "解锁参数" : "锁定参数"}
+                        >
+                          {isParamLocked('drawbridgeAngle') ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                        </button>
+                      </div>
                       <span className="text-amber-400 font-mono">{Math.round(params.drawbridgeAngle)}°</span>
                     </div>
                     <input
@@ -698,28 +1112,49 @@ export function ControlPanel() {
                       max={90}
                       step={1}
                       value={params.drawbridgeAngle}
-                      onChange={(e) => setDrawbridgeAngle(parseFloat(e.target.value))}
-                      className="w-full h-2 rounded-full appearance-none cursor-pointer
-                        [&::-webkit-slider-thumb]:appearance-none
-                        [&::-webkit-slider-thumb]:w-4
-                        [&::-webkit-slider-thumb]:h-4
-                        [&::-webkit-slider-thumb]:rounded-full
-                        [&::-webkit-slider-thumb]:bg-amber-500
-                        [&::-webkit-slider-thumb]:cursor-pointer"
+                      onChange={(e) => !isParamLocked('drawbridgeAngle') && setDrawbridgeAngle(parseFloat(e.target.value))}
+                      disabled={isParamLocked('drawbridgeAngle')}
+                      className={cn(
+                        "w-full h-2 rounded-full appearance-none",
+                        isParamLocked('drawbridgeAngle') ? "cursor-not-allowed" : "cursor-pointer",
+                        "[&::-webkit-slider-thumb]:appearance-none",
+                        "[&::-webkit-slider-thumb]:w-4",
+                        "[&::-webkit-slider-thumb]:h-4",
+                        "[&::-webkit-slider-thumb]:rounded-full",
+                        "[&::-webkit-slider-thumb]:bg-amber-500",
+                        "[&::-webkit-slider-thumb]:shadow-lg",
+                        "[&::-webkit-slider-thumb]:shadow-amber-500/30",
+                        "[&::-webkit-slider-thumb]:transition-transform",
+                        !isParamLocked('drawbridgeAngle') && "[&::-webkit-slider-thumb]:hover:scale-110",
+                        "[&::-moz-range-thumb]:w-4",
+                        "[&::-moz-range-thumb]:h-4",
+                        "[&::-moz-range-thumb]:rounded-full",
+                        "[&::-moz-range-thumb]:bg-amber-500",
+                        "[&::-moz-range-thumb]:border-none"
+                      )}
                       style={{
                         background: `linear-gradient(to right, #92400e 0%, #f59e0b ${params.drawbridgeAngle / 90 * 100}%, #78716c ${params.drawbridgeAngle / 90 * 100}%, #57534e 100%)`,
+                        opacity: isParamLocked('drawbridgeAngle') ? 0.5 : 1,
                       }}
                     />
                     <div className="grid grid-cols-2 gap-1.5 mt-2">
                       <button
-                        onClick={() => setDrawbridgeAngle(0)}
-                        className="px-2 py-1 bg-stone-700/50 hover:bg-stone-600/50 border border-stone-600 rounded text-[10px] text-stone-200 transition-colors"
+                        onClick={() => !isParamLocked('drawbridgeAngle') && setDrawbridgeAngle(0)}
+                        disabled={isParamLocked('drawbridgeAngle')}
+                        className={cn(
+                          "px-2 py-1 border border-stone-600 rounded text-[10px] text-stone-200 transition-colors",
+                          isParamLocked('drawbridgeAngle') ? 'opacity-50 cursor-not-allowed bg-stone-700/50' : 'bg-stone-700/50 hover:bg-stone-600/50'
+                        )}
                       >
                         ▼ 放下 (0°)
                       </button>
                       <button
-                        onClick={() => setDrawbridgeAngle(75)}
-                        className="px-2 py-1 bg-stone-700/50 hover:bg-stone-600/50 border border-stone-600 rounded text-[10px] text-stone-200 transition-colors"
+                        onClick={() => !isParamLocked('drawbridgeAngle') && setDrawbridgeAngle(75)}
+                        disabled={isParamLocked('drawbridgeAngle')}
+                        className={cn(
+                          "px-2 py-1 border border-stone-600 rounded text-[10px] text-stone-200 transition-colors",
+                          isParamLocked('drawbridgeAngle') ? 'opacity-50 cursor-not-allowed bg-stone-700/50' : 'bg-stone-700/50 hover:bg-stone-600/50'
+                        )}
                       >
                         ▲ 抬起 (75°)
                       </button>
@@ -737,11 +1172,33 @@ export function ControlPanel() {
                   label="启用铁闸门"
                   checked={params.hasPortcullis}
                   onChange={(v) => setParams({ hasPortcullis: v })}
+                  locked={isParamLocked('hasPortcullis')}
+                  paramKey="hasPortcullis"
+                  onToggleLock={toggleParamLock}
                 />
                 {params.hasPortcullis && (
                   <div className="mt-2">
                     <div className="flex justify-between items-center text-xs mb-1">
-                      <label className="text-stone-300">升起高度</label>
+                      <div className="flex items-center gap-1.5">
+                        <label className={cn(
+                          "font-medium",
+                          isParamLocked('portcullisPosition') ? "text-stone-500" : "text-stone-300"
+                        )}>
+                          升起高度
+                        </label>
+                        <button
+                          onClick={() => toggleParamLock('portcullisPosition')}
+                          className={cn(
+                            "p-0.5 rounded transition-colors",
+                            isParamLocked('portcullisPosition')
+                              ? "text-red-500"
+                              : "text-stone-600 hover:text-stone-400"
+                          )}
+                          title={isParamLocked('portcullisPosition') ? "解锁参数" : "锁定参数"}
+                        >
+                          {isParamLocked('portcullisPosition') ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                        </button>
+                      </div>
                       <span className="text-red-400 font-mono">{Math.round(params.portcullisPosition * 100)}%</span>
                     </div>
                     <input
@@ -750,28 +1207,49 @@ export function ControlPanel() {
                       max={1}
                       step={0.02}
                       value={params.portcullisPosition}
-                      onChange={(e) => setPortcullisPosition(parseFloat(e.target.value))}
-                      className="w-full h-2 rounded-full appearance-none cursor-pointer
-                        [&::-webkit-slider-thumb]:appearance-none
-                        [&::-webkit-slider-thumb]:w-4
-                        [&::-webkit-slider-thumb]:h-4
-                        [&::-webkit-slider-thumb]:rounded-full
-                        [&::-webkit-slider-thumb]:bg-red-500
-                        [&::-webkit-slider-thumb]:cursor-pointer"
+                      onChange={(e) => !isParamLocked('portcullisPosition') && setPortcullisPosition(parseFloat(e.target.value))}
+                      disabled={isParamLocked('portcullisPosition')}
+                      className={cn(
+                        "w-full h-2 rounded-full appearance-none",
+                        isParamLocked('portcullisPosition') ? "cursor-not-allowed" : "cursor-pointer",
+                        "[&::-webkit-slider-thumb]:appearance-none",
+                        "[&::-webkit-slider-thumb]:w-4",
+                        "[&::-webkit-slider-thumb]:h-4",
+                        "[&::-webkit-slider-thumb]:rounded-full",
+                        "[&::-webkit-slider-thumb]:bg-red-500",
+                        "[&::-webkit-slider-thumb]:shadow-lg",
+                        "[&::-webkit-slider-thumb]:shadow-red-500/30",
+                        "[&::-webkit-slider-thumb]:transition-transform",
+                        !isParamLocked('portcullisPosition') && "[&::-webkit-slider-thumb]:hover:scale-110",
+                        "[&::-moz-range-thumb]:w-4",
+                        "[&::-moz-range-thumb]:h-4",
+                        "[&::-moz-range-thumb]:rounded-full",
+                        "[&::-moz-range-thumb]:bg-red-500",
+                        "[&::-moz-range-thumb]:border-none"
+                      )}
                       style={{
                         background: `linear-gradient(to right, #7f1d1d 0%, #ef4444 ${params.portcullisPosition * 100}%, #78716c ${params.portcullisPosition * 100}%, #57534e 100%)`,
+                        opacity: isParamLocked('portcullisPosition') ? 0.5 : 1,
                       }}
                     />
                     <div className="grid grid-cols-2 gap-1.5 mt-2">
                       <button
-                        onClick={() => setPortcullisPosition(0)}
-                        className="px-2 py-1 bg-stone-700/50 hover:bg-stone-600/50 border border-stone-600 rounded text-[10px] text-stone-200 transition-colors"
+                        onClick={() => !isParamLocked('portcullisPosition') && setPortcullisPosition(0)}
+                        disabled={isParamLocked('portcullisPosition')}
+                        className={cn(
+                          "px-2 py-1 border border-stone-600 rounded text-[10px] text-stone-200 transition-colors",
+                          isParamLocked('portcullisPosition') ? 'opacity-50 cursor-not-allowed bg-stone-700/50' : 'bg-stone-700/50 hover:bg-stone-600/50'
+                        )}
                       >
                         ⬇ 关闭
                       </button>
                       <button
-                        onClick={() => setPortcullisPosition(1)}
-                        className="px-2 py-1 bg-stone-700/50 hover:bg-stone-600/50 border border-stone-600 rounded text-[10px] text-stone-200 transition-colors"
+                        onClick={() => !isParamLocked('portcullisPosition') && setPortcullisPosition(1)}
+                        disabled={isParamLocked('portcullisPosition')}
+                        className={cn(
+                          "px-2 py-1 border border-stone-600 rounded text-[10px] text-stone-200 transition-colors",
+                          isParamLocked('portcullisPosition') ? 'opacity-50 cursor-not-allowed bg-stone-700/50' : 'bg-stone-700/50 hover:bg-stone-600/50'
+                        )}
                       >
                         ⬆ 开启
                       </button>
@@ -845,8 +1323,15 @@ export function ControlPanel() {
             </>
           )}
         </CollapsibleSection>
+        )}
 
-        <CollapsibleSection title="内部建筑" icon={<Building2 className="w-4 h-4" />}>
+        {panelGroups.buildings && (
+        <CollapsibleSection
+          title="内部建筑"
+          icon={<Building2 className="w-4 h-4" />}
+          locked={isGroupLocked('buildings')}
+          onToggleLock={() => toggleGroupLock('buildings')}
+        >
           <SliderControl
             label="基础高度"
             value={params.buildingHeight}
@@ -855,12 +1340,17 @@ export function ControlPanel() {
             step={0.5}
             onChange={(v) => setParams({ buildingHeight: v })}
             unit="m"
+            locked={isParamLocked('buildingHeight')}
+            paramKey="buildingHeight"
+            onToggleLock={toggleParamLock}
           />
           <div className="mt-3 space-y-2">
             <p className="text-xs text-stone-400">建筑类型分布</p>
             {(Object.keys(BUILDING_TYPE_INFO) as BuildingType[]).map((type) => {
               const info = BUILDING_TYPE_INFO[type];
               const count = params.buildingTypeDistribution[type];
+              const paramKey = `buildingTypeDistribution.${type}`;
+              const locked = isParamLocked(paramKey);
               return (
                 <div
                   key={type}
@@ -869,19 +1359,49 @@ export function ControlPanel() {
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-1.5">
                       <span className="text-base">{info.icon}</span>
-                      <span className="text-xs text-stone-200 font-medium">{info.name}</span>
+                      <span className={cn(
+                        "text-xs font-medium",
+                        locked ? "text-stone-500" : "text-stone-200"
+                      )}>
+                        {info.name}
+                      </span>
+                      <button
+                        onClick={() => toggleParamLock(paramKey)}
+                        className={cn(
+                          "p-0.5 rounded transition-colors",
+                          locked
+                            ? "text-amber-500"
+                            : "text-stone-600 hover:text-stone-400"
+                        )}
+                        title={locked ? "解锁参数" : "锁定参数"}
+                      >
+                        {locked ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
+                      </button>
                     </div>
                     <div className="flex items-center gap-1">
                       <button
-                        onClick={() => setBuildingTypeDistribution(type, count - 1)}
-                        className="w-5 h-5 flex items-center justify-center bg-stone-700 hover:bg-stone-600 rounded text-stone-300 text-xs transition-colors"
+                        onClick={() => !locked && setBuildingTypeDistribution(type, count - 1)}
+                        disabled={locked}
+                        className={cn(
+                          "w-5 h-5 flex items-center justify-center rounded text-xs transition-colors",
+                          locked ? 'opacity-50 cursor-not-allowed bg-stone-700 text-stone-500' : 'bg-stone-700 hover:bg-stone-600 text-stone-300'
+                        )}
                       >
                         −
                       </button>
-                      <span className="w-6 text-center text-xs text-amber-400 font-mono">{count}</span>
+                      <span className={cn(
+                        "w-6 text-center text-xs font-mono",
+                        locked ? "text-stone-500" : "text-amber-400"
+                      )}>
+                        {count}
+                      </span>
                       <button
-                        onClick={() => setBuildingTypeDistribution(type, count + 1)}
-                        className="w-5 h-5 flex items-center justify-center bg-stone-700 hover:bg-stone-600 rounded text-stone-300 text-xs transition-colors"
+                        onClick={() => !locked && setBuildingTypeDistribution(type, count + 1)}
+                        disabled={locked}
+                        className={cn(
+                          "w-5 h-5 flex items-center justify-center rounded text-xs transition-colors",
+                          locked ? 'opacity-50 cursor-not-allowed bg-stone-700 text-stone-500' : 'bg-stone-700 hover:bg-stone-600 text-stone-300'
+                        )}
                       >
                         +
                       </button>
@@ -898,12 +1418,22 @@ export function ControlPanel() {
             提示：建筑会按尺寸从大到小自动排布，避免重叠
           </p>
         </CollapsibleSection>
+        )}
 
-        <CollapsibleSection title="居民模式" icon={<Users className="w-4 h-4" />}>
+        {panelGroups.residents && (
+        <CollapsibleSection
+          title="居民模式"
+          icon={<Users className="w-4 h-4" />}
+          locked={isGroupLocked('residents')}
+          onToggleLock={() => toggleGroupLock('residents')}
+        >
           <ToggleControl
             label="启用居民模式"
             checked={params.residentMode}
             onChange={(v) => setParams({ residentMode: v })}
+            locked={isParamLocked('residentMode')}
+            paramKey="residentMode"
+            onToggleLock={toggleParamLock}
           />
           {params.residentMode && (
             <>
@@ -915,6 +1445,9 @@ export function ControlPanel() {
                 step={1}
                 onChange={(v) => setParams({ residentCount: v })}
                 unit="人"
+                locked={isParamLocked('residentCount')}
+                paramKey="residentCount"
+                onToggleLock={toggleParamLock}
               />
               <div className="space-y-2 mt-3">
                 <p className="text-xs text-stone-400">居民类型分布</p>
@@ -940,6 +1473,9 @@ export function ControlPanel() {
                   step={0.05}
                   onChange={(v) => setParams({ farmerRatio: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
+                  locked={isParamLocked('farmerRatio')}
+                  paramKey="farmerRatio"
+                  onToggleLock={toggleParamLock}
                 />
                 <SliderControl
                   label="士兵比例"
@@ -949,6 +1485,9 @@ export function ControlPanel() {
                   step={0.05}
                   onChange={(v) => setParams({ soldierRatio: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
+                  locked={isParamLocked('soldierRatio')}
+                  paramKey="soldierRatio"
+                  onToggleLock={toggleParamLock}
                 />
                 <SliderControl
                   label="贵族比例"
@@ -958,6 +1497,9 @@ export function ControlPanel() {
                   step={0.05}
                   onChange={(v) => setParams({ nobleRatio: v })}
                   format={(v) => `${Math.round(v * 100)}%`}
+                  locked={isParamLocked('nobleRatio')}
+                  paramKey="nobleRatio"
+                  onToggleLock={toggleParamLock}
                 />
                 <p className="text-[10px] text-stone-500 italic">
                   提示：不同类型的居民有不同的活动区域和行为特征
@@ -966,8 +1508,16 @@ export function ControlPanel() {
             </>
           )}
         </CollapsibleSection>
+        )}
 
-        <CollapsibleSection title="材质效果" icon={<Palette className="w-4 h-4" />} defaultOpen>
+        {panelGroups.materials && (
+        <CollapsibleSection
+          title="材质效果"
+          icon={<Palette className="w-4 h-4" />}
+          defaultOpen
+          locked={isGroupLocked('materials')}
+          onToggleLock={() => toggleGroupLock('materials')}
+        >
           <div className="flex items-center justify-between mb-3">
             <p className="text-xs text-stone-400">调整材质细节与老化程度</p>
             <button
@@ -992,6 +1542,9 @@ export function ControlPanel() {
               step={0.05}
               onChange={(v) => setMaterialParams({ agingLevel: v })}
               format={(v) => `${Math.round(v * 100)}%`}
+              locked={isParamLocked('materialParams.agingLevel')}
+              paramKey="materialParams.agingLevel"
+              onToggleLock={toggleParamLock}
             />
           </div>
 
@@ -1008,6 +1561,9 @@ export function ControlPanel() {
               step={0.05}
               onChange={(v) => setMaterialParams({ mossCoverage: v })}
               format={(v) => `${Math.round(v * 100)}%`}
+              locked={isParamLocked('materialParams.mossCoverage')}
+              paramKey="materialParams.mossCoverage"
+              onToggleLock={toggleParamLock}
             />
           </div>
 
@@ -1024,6 +1580,9 @@ export function ControlPanel() {
               step={0.05}
               onChange={(v) => setMaterialParams({ stoneCrackLevel: v })}
               format={(v) => `${Math.round(v * 100)}%`}
+              locked={isParamLocked('materialParams.stoneCrackLevel')}
+              paramKey="materialParams.stoneCrackLevel"
+              onToggleLock={toggleParamLock}
             />
             <SliderControl
               label="污渍程度"
@@ -1033,6 +1592,9 @@ export function ControlPanel() {
               step={0.05}
               onChange={(v) => setMaterialParams({ stoneStainLevel: v })}
               format={(v) => `${Math.round(v * 100)}%`}
+              locked={isParamLocked('materialParams.stoneStainLevel')}
+              paramKey="materialParams.stoneStainLevel"
+              onToggleLock={toggleParamLock}
             />
           </div>
 
@@ -1049,6 +1611,9 @@ export function ControlPanel() {
               step={0.05}
               onChange={(v) => setMaterialParams({ woodGrainLevel: v })}
               format={(v) => `${Math.round(v * 100)}%`}
+              locked={isParamLocked('materialParams.woodGrainLevel')}
+              paramKey="materialParams.woodGrainLevel"
+              onToggleLock={toggleParamLock}
             />
             <SliderControl
               label="年轮明显度"
@@ -1058,6 +1623,9 @@ export function ControlPanel() {
               step={0.05}
               onChange={(v) => setMaterialParams({ woodRingLevel: v })}
               format={(v) => `${Math.round(v * 100)}%`}
+              locked={isParamLocked('materialParams.woodRingLevel')}
+              paramKey="materialParams.woodRingLevel"
+              onToggleLock={toggleParamLock}
             />
           </div>
 
@@ -1074,6 +1642,9 @@ export function ControlPanel() {
               step={0.05}
               onChange={(v) => setMaterialParams({ waterRippleLevel: v })}
               format={(v) => `${Math.round(v * 100)}%`}
+              locked={isParamLocked('materialParams.waterRippleLevel')}
+              paramKey="materialParams.waterRippleLevel"
+              onToggleLock={toggleParamLock}
             />
             <SliderControl
               label="水体清澈度"
@@ -1083,25 +1654,53 @@ export function ControlPanel() {
               step={0.05}
               onChange={(v) => setMaterialParams({ waterClarity: v })}
               format={(v) => `${Math.round(v * 100)}%`}
+              locked={isParamLocked('materialParams.waterClarity')}
+              paramKey="materialParams.waterClarity"
+              onToggleLock={toggleParamLock}
             />
           </div>
         </CollapsibleSection>
+        )}
 
-        <CollapsibleSection title="随机种子" icon={<Hash className="w-4 h-4" />} defaultOpen={false}>
+        {panelGroups.seed && (
+        <CollapsibleSection
+          title="随机种子"
+          icon={<Hash className="w-4 h-4" />}
+          defaultOpen={false}
+          locked={isGroupLocked('seed')}
+          onToggleLock={() => toggleGroupLock('seed')}
+        >
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <input
                 type="number"
                 value={params.seed}
-                onChange={(e) => setParams({ seed: parseInt(e.target.value) || 0 })}
-                className="flex-1 px-3 py-2 bg-stone-800 border border-stone-600 rounded text-sm text-stone-200 focus:outline-none focus:border-amber-500 font-mono"
+                onChange={(e) => !isParamLocked('seed') && setParams({ seed: parseInt(e.target.value) || 0 })}
+                disabled={isParamLocked('seed')}
+                className={cn(
+                  "flex-1 px-3 py-2 bg-stone-800 border border-stone-600 rounded text-sm text-stone-200 focus:outline-none focus:border-amber-500 font-mono",
+                  isParamLocked('seed') ? "cursor-not-allowed opacity-50" : ""
+                )}
               />
+              <button
+                onClick={() => toggleParamLock('seed')}
+                className={cn(
+                  "p-2 rounded transition-colors",
+                  isParamLocked('seed')
+                    ? "text-amber-500 bg-amber-900/30"
+                    : "text-stone-400 hover:text-stone-300 bg-stone-700 hover:bg-stone-600"
+                )}
+                title={isParamLocked('seed') ? "解锁参数" : "锁定参数"}
+              >
+                {isParamLocked('seed') ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+              </button>
             </div>
             <p className="text-xs text-stone-500">
               相同种子生成相同城堡，用于复现设计
             </p>
           </div>
         </CollapsibleSection>
+        )}
       </div>
 
       <div className="p-3 border-t border-amber-900/30 bg-stone-900">
@@ -1110,6 +1709,14 @@ export function ControlPanel() {
           <span>拖动旋转 · 滚轮缩放 · 右键平移</span>
         </div>
       </div>
+      <PanelSettingsDialog
+        isOpen={showPanelSettings}
+        onClose={() => setShowPanelSettings(false)}
+        panelGroups={panelGroups}
+        onTogglePanel={togglePanelGroup}
+        onShowAll={handleShowAllPanels}
+        onHideAll={handleHideAllPanels}
+      />
     </div>
   );
 }

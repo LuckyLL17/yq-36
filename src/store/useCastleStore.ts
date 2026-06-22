@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WallStyle, WALL_STYLE_PRESETS, TowerType, DEFAULT_TOWER_PARAMS, DEFAULT_MOAT_WATER_PARAMS, MoatSegment, TowerSpecificParams, BuildingType, UVMappingMode, MaterialParams, DEFAULT_MATERIAL_PARAMS } from '@/types/castle';
+import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, WallStyle, WALL_STYLE_PRESETS, TowerType, TOWER_TYPE_INFO, DEFAULT_TOWER_PARAMS, DEFAULT_MOAT_WATER_PARAMS, MoatSegment, TowerSpecificParams, BuildingType, UVMappingMode, MaterialParams, DEFAULT_MATERIAL_PARAMS, PanelGroupId } from '@/types/castle';
 import { getInterpolatedStyle } from '@/data/historicalEras';
 
 function generateDefaultMoatSegments(): MoatSegment[] {
@@ -190,6 +190,86 @@ function generateCorridors(rooms: Room[]): Corridor[] {
   return corridors;
 }
 
+const RANDOMIZABLE_PARAMS: Record<string, { min: number; max: number; step?: number }> = {
+  plotWidth: { min: 20, max: 80, step: 1 },
+  plotDepth: { min: 15, max: 60, step: 1 },
+  wallHeight: { min: 4, max: 20, step: 0.5 },
+  wallThickness: { min: 1, max: 5, step: 0.5 },
+  towerCount: { min: 4, max: 12, step: 1 },
+  towerHeight: { min: 8, max: 25, step: 1 },
+  towerRadius: { min: 2, max: 6, step: 0.5 },
+  moatWidth: { min: 2, max: 10, step: 0.5 },
+  moatDepth: { min: 1, max: 8, step: 0.5 },
+  gateWidth: { min: 2, max: 10, step: 0.5 },
+  gateHeight: { min: 3, max: 12, step: 0.5 },
+  buildingHeight: { min: 3, max: 15, step: 0.5 },
+  terrainAmplitude: { min: 0, max: 15, step: 0.2 },
+  terrainFrequency: { min: 0.5, max: 6, step: 0.1 },
+  terrainScale: { min: 0.01, max: 0.1, step: 0.005 },
+  timeOfDay: { min: 0, max: 24, step: 0.1 },
+  residentCount: { min: 3, max: 50, step: 1 },
+  farmerRatio: { min: 0, max: 1, step: 0.05 },
+  soldierRatio: { min: 0, max: 1, step: 0.05 },
+  nobleRatio: { min: 0, max: 1, step: 0.05 },
+  'moatWaterParams.globalWaterLevel': { min: 0, max: 1, step: 0.05 },
+  'moatWaterParams.waveHeight': { min: 0, max: 0.5, step: 0.02 },
+  'moatWaterParams.flowSpeed': { min: 0, max: 3, step: 0.1 },
+  drawbridgeAngle: { min: 0, max: 90, step: 1 },
+  portcullisPosition: { min: 0, max: 1, step: 0.02 },
+  barLatchPosition: { min: 0, max: 1, step: 0.02 },
+  'materialParams.agingLevel': { min: 0, max: 1, step: 0.05 },
+  'materialParams.mossCoverage': { min: 0, max: 1, step: 0.05 },
+  'materialParams.stoneCrackLevel': { min: 0, max: 1, step: 0.05 },
+  'materialParams.stoneStainLevel': { min: 0, max: 1, step: 0.05 },
+  'materialParams.woodGrainLevel': { min: 0, max: 1, step: 0.05 },
+  'materialParams.woodRingLevel': { min: 0, max: 1, step: 0.05 },
+  'materialParams.waterRippleLevel': { min: 0, max: 1, step: 0.05 },
+  'materialParams.waterClarity': { min: 0, max: 1, step: 0.05 },
+  'towerSpecificParams.squareFort.crenellationHeight': { min: 0.5, max: 3, step: 0.1 },
+  'towerSpecificParams.squareFort.buttressCount': { min: 0, max: 8, step: 1 },
+  'towerSpecificParams.squareFort.windowRows': { min: 1, max: 6, step: 1 },
+  'towerSpecificParams.polygonTower.sides': { min: 5, max: 12, step: 1 },
+  'towerSpecificParams.polygonTower.pinnacleCount': { min: 0, max: 12, step: 1 },
+  'towerSpecificParams.polygonTower.turretHeight': { min: 0.5, max: 5, step: 0.5 },
+  'towerSpecificParams.spiralStair.stairWidth': { min: 0.5, max: 2.5, step: 0.1 },
+  'towerSpecificParams.spiralStair.stairTurns': { min: 2, max: 8, step: 1 },
+  'towerSpecificParams.spiralStair.centralColumnRadius': { min: 0.3, max: 1.5, step: 0.1 },
+  'towerSpecificParams.gatehouse.archWidth': { min: 3, max: 10, step: 0.5 },
+  'towerSpecificParams.gatehouse.archHeight': { min: 3, max: 10, step: 0.5 },
+  'towerSpecificParams.gatehouse.towerSpacing': { min: 5, max: 15, step: 0.5 },
+  'towerSpecificParams.gatehouse.gatehouseDepth': { min: 3, max: 12, step: 0.5 },
+};
+
+const RANDOMIZABLE_ENUMS = {
+  terrainType: Object.keys(TERRAIN_PRESETS) as TerrainType[],
+  weather: Object.keys(WEATHER_PRESETS) as WeatherType[],
+  wallStyle: Object.keys(WALL_STYLE_PRESETS) as WallStyle[],
+  towerType: Object.keys(TOWER_TYPE_INFO) as TowerType[],
+};
+
+function randomInRange(min: number, max: number, step: number = 1): number {
+  const range = max - min;
+  const steps = Math.floor(range / step);
+  const randomStep = Math.floor(Math.random() * (steps + 1));
+  return Math.round((min + randomStep * step) * 1000) / 1000;
+}
+
+function getNestedValue(obj: any, path: string): any {
+  return path.split('.').reduce((acc, key) => acc?.[key], obj);
+}
+
+function setNestedValue(obj: any, path: string, value: any): any {
+  const keys = path.split('.');
+  const result = { ...obj };
+  let current = result;
+  for (let i = 0; i < keys.length - 1; i++) {
+    current[keys[i]] = { ...current[keys[i]] };
+    current = current[keys[i]];
+  }
+  current[keys[keys.length - 1]] = value;
+  return result;
+}
+
 export const useCastleStore = create<CastleState>((set, get) => ({
   params: defaultParams,
   viewMode: 'solid',
@@ -204,6 +284,21 @@ export const useCastleStore = create<CastleState>((set, get) => ({
   selectedNPCType: null,
   uvMappingMode: 'auto' as UVMappingMode,
   showSeams: false,
+  lockedParams: new Set<string>(),
+  panelGroups: {
+    terrain: true,
+    weather: true,
+    wallStyle: true,
+    plot: true,
+    walls: true,
+    towers: true,
+    gates: true,
+    moat: true,
+    buildings: true,
+    residents: true,
+    materials: true,
+    seed: true,
+  },
   setParams: (newParams) =>
     set((state) => ({
       params: { ...state.params, ...newParams },
@@ -507,5 +602,98 @@ export const useCastleStore = create<CastleState>((set, get) => ({
         ...state.params,
         materialParams: { ...DEFAULT_MATERIAL_PARAMS },
       },
+    })),
+  toggleParamLock: (paramKey: string) =>
+    set((state) => {
+      const newLocked = new Set(state.lockedParams);
+      if (newLocked.has(paramKey)) {
+        newLocked.delete(paramKey);
+      } else {
+        newLocked.add(paramKey);
+      }
+      return { lockedParams: newLocked };
+    }),
+  isParamLocked: (paramKey: string) => {
+    return get().lockedParams.has(paramKey);
+  },
+  togglePanelGroup: (groupId: PanelGroupId) =>
+    set((state) => ({
+      panelGroups: {
+        ...state.panelGroups,
+        [groupId]: !state.panelGroups[groupId],
+      },
+    })),
+  setPanelGroupVisible: (groupId: PanelGroupId, visible: boolean) =>
+    set((state) => ({
+      panelGroups: {
+        ...state.panelGroups,
+        [groupId]: visible,
+      },
+    })),
+  randomizeAllParams: () =>
+    set((state) => {
+      let newParams = { ...state.params };
+      const locked = state.lockedParams;
+
+      Object.entries(RANDOMIZABLE_PARAMS).forEach(([key, config]) => {
+        if (!locked.has(key)) {
+          const value = randomInRange(config.min, config.max, config.step);
+          newParams = setNestedValue(newParams, key, value);
+        }
+      });
+
+      Object.entries(RANDOMIZABLE_ENUMS).forEach(([key, options]) => {
+        if (!locked.has(key)) {
+          const randomIndex = Math.floor(Math.random() * options.length);
+          newParams = setNestedValue(newParams, key, options[randomIndex]);
+        }
+      });
+
+      if (!locked.has('seed')) {
+        newParams.seed = Math.floor(Math.random() * 100000);
+      }
+
+      if (!locked.has('hasMoat')) {
+        newParams.hasMoat = Math.random() > 0.3;
+      }
+      if (!locked.has('hasPortcullis')) {
+        newParams.hasPortcullis = Math.random() > 0.3;
+      }
+      if (!locked.has('hasDrawbridge')) {
+        newParams.hasDrawbridge = Math.random() > 0.3;
+      }
+      if (!locked.has('hasGatehouse')) {
+        newParams.hasGatehouse = Math.random() > 0.3;
+      }
+      if (!locked.has('hasBarLatch')) {
+        newParams.hasBarLatch = Math.random() > 0.4;
+      }
+      if (!locked.has('residentMode')) {
+        newParams.residentMode = Math.random() > 0.5;
+      }
+      if (!locked.has('moatWaterParams.isAnimated')) {
+        newParams.moatWaterParams.isAnimated = Math.random() > 0.2;
+      }
+
+      return { params: newParams };
+    }),
+  lockAllParams: () =>
+    set((state) => {
+      const allParams = new Set(state.lockedParams);
+      Object.keys(RANDOMIZABLE_PARAMS).forEach((key) => allParams.add(key));
+      Object.keys(RANDOMIZABLE_ENUMS).forEach((key) => allParams.add(key));
+      allParams.add('seed');
+      allParams.add('hasMoat');
+      allParams.add('hasPortcullis');
+      allParams.add('hasDrawbridge');
+      allParams.add('hasGatehouse');
+      allParams.add('hasBarLatch');
+      allParams.add('residentMode');
+      allParams.add('moatWaterParams.isAnimated');
+      return { lockedParams: allParams };
+    }),
+  unlockAllParams: () =>
+    set(() => ({
+      lockedParams: new Set<string>(),
     })),
 }));

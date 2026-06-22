@@ -506,6 +506,22 @@ export interface RoomTemplate {
   color: string;
 }
 
+export type PanelGroupId = 'terrain' | 'weather' | 'wallStyle' | 'plot' | 'walls' | 'towers' | 'gates' | 'moat' | 'buildings' | 'residents' | 'materials' | 'seed';
+
+export interface PanelGroupConfig {
+  id: PanelGroupId;
+  title: string;
+  visible: boolean;
+}
+
+export interface ParamConfig {
+  key: keyof CastleParams | string;
+  min?: number;
+  max?: number;
+  step?: number;
+  randomizable: boolean;
+}
+
 export interface CastleState {
   params: CastleParams;
   viewMode: ViewMode;
@@ -516,6 +532,8 @@ export interface CastleState {
   selectedNPCType: NPCType | null;
   uvMappingMode: UVMappingMode;
   showSeams: boolean;
+  lockedParams: Set<string>;
+  panelGroups: Record<PanelGroupId, boolean>;
   setParams: (params: Partial<CastleParams>) => void;
   setViewMode: (mode: ViewMode) => void;
   setCastleGeometries: (geometries: CastleMeshData | null) => void;
@@ -551,4 +569,11 @@ export interface CastleState {
   toggleShowSeams: () => void;
   setMaterialParams: (params: Partial<MaterialParams>) => void;
   resetMaterialParams: () => void;
+  toggleParamLock: (paramKey: string) => void;
+  isParamLocked: (paramKey: string) => boolean;
+  togglePanelGroup: (groupId: PanelGroupId) => void;
+  setPanelGroupVisible: (groupId: PanelGroupId, visible: boolean) => void;
+  randomizeAllParams: () => void;
+  lockAllParams: () => void;
+  unlockAllParams: () => void;
 }
