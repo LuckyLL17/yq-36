@@ -1,4 +1,4 @@
-import { CastleParams, GenerationAlgorithm, LSystemConfig, CellularAutomataConfig, EvolutionConfig, DEFAULT_LSYSTEM_CONFIG, DEFAULT_CELLULAR_AUTOMATA_CONFIG, DEFAULT_EVOLUTION_CONFIG } from '@/types/castle';
+import { CastleParams, GenerationAlgorithm, LSystemConfig, CellularAutomataConfig, EvolutionConfig, DEFAULT_LSYSTEM_CONFIG, DEFAULT_CELLULAR_AUTOMATA_CONFIG, DEFAULT_EVOLUTION_CONFIG, GenerationMetadata } from '@/types/castle';
 import { LSystemEngine } from './LSystemEngine';
 import { CellularAutomataEngine } from './CellularAutomataEngine';
 import { EvolutionEngine, EvolutionResult } from './EvolutionEngine';
@@ -6,11 +6,7 @@ import { EvolutionEngine, EvolutionResult } from './EvolutionEngine';
 export interface GenerationResult {
   params: Partial<CastleParams>;
   algorithm: GenerationAlgorithm;
-  metadata: {
-    lsystemLayout?: ReturnType<LSystemEngine['generateLayout']>;
-    caGrid?: boolean[][];
-    evolutionResult?: EvolutionResult;
-  };
+  metadata: GenerationMetadata;
 }
 
 export class GenerationStrategy {
@@ -53,14 +49,14 @@ export class GenerationStrategy {
   private lsystemGenerate(baseParams: CastleParams, config: LSystemConfig): GenerationResult {
     const engine = new LSystemEngine(this.seed, config);
     const lstring = engine.generate();
-    const layout = engine.generateLayout(lstring);
+    const segments = engine.interpret(lstring);
     const params = engine.generateParams(baseParams);
 
     return {
       params,
       algorithm: 'lsystem',
       metadata: {
-        lsystemLayout: layout,
+        lsystemSegments: segments,
       },
     };
   }
@@ -74,7 +70,10 @@ export class GenerationStrategy {
       params,
       algorithm: 'cellular_automata',
       metadata: {
-        caGrid: result.grid.cells,
+        caBuildingPositions: result.buildingPositions,
+        caTerrainMap: result.terrainMap,
+        caWallMap: result.wallMap,
+        caGridSize: result.grid.width,
       },
     };
   }

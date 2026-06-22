@@ -21,6 +21,7 @@ export function Castle({ params, viewMode }: CastleProps) {
   const portcullisRef = useRef<THREE.Group>(null);
   const barLatchRef = useRef<THREE.Group>(null);
   const setCastleGeometries = useCastleStore((state) => state.setCastleGeometries);
+  const generationMetadata = useCastleStore((state) => state.generationMetadata);
   const uvMappingMode = useCastleStore((s) => s.uvMappingMode as UVMappingMode);
   const showSeams = useCastleStore((s) => s.showSeams);
   const [, setAnimProgress] = useState(0);
@@ -28,7 +29,7 @@ export function Castle({ params, viewMode }: CastleProps) {
   const animCurrentRef = useRef(0);
 
   const generatorData = useMemo(() => {
-    const generator = new CastleGenerator(params);
+    const generator = new CastleGenerator(params, generationMetadata);
     const style = getInterpolatedStyle(params.eraYear);
     const result = generator.generateAll(style.crenellationHeightMultiplier);
 
@@ -75,7 +76,7 @@ export function Castle({ params, viewMode }: CastleProps) {
     const seamGeometry = UVUnwrapper.buildSeamLineSegments(islands);
 
     return { ...result, uvGeometries: uvGeos, uvIslands: islands, seamGeometry };
-  }, [params, uvMappingMode]);
+  }, [params, generationMetadata, uvMappingMode]);
 
   const { walls, towers, gate, gatehouse, barLatch, moat, moatSegments, water, waterSegments, drawbridge, portcullis, buildings, buildingTypes, ground, uvGeometries, seamGeometry } = generatorData;
 

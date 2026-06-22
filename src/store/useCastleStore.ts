@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, WallStyle, WALL_STYLE_PRESETS, TowerType, TOWER_TYPE_INFO, DEFAULT_TOWER_PARAMS, DEFAULT_MOAT_WATER_PARAMS, MoatSegment, TowerSpecificParams, BuildingType, UVMappingMode, MaterialParams, DEFAULT_MATERIAL_PARAMS, PanelGroupId, GenerationAlgorithm, LSystemConfig, CellularAutomataConfig, EvolutionConfig, DEFAULT_LSYSTEM_CONFIG, DEFAULT_CELLULAR_AUTOMATA_CONFIG, DEFAULT_EVOLUTION_CONFIG } from '@/types/castle';
+import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, WallStyle, WALL_STYLE_PRESETS, TowerType, TOWER_TYPE_INFO, DEFAULT_TOWER_PARAMS, DEFAULT_MOAT_WATER_PARAMS, MoatSegment, TowerSpecificParams, BuildingType, UVMappingMode, MaterialParams, DEFAULT_MATERIAL_PARAMS, PanelGroupId, GenerationAlgorithm, LSystemConfig, CellularAutomataConfig, EvolutionConfig, DEFAULT_LSYSTEM_CONFIG, DEFAULT_CELLULAR_AUTOMATA_CONFIG, DEFAULT_EVOLUTION_CONFIG, GenerationMetadata } from '@/types/castle';
 import { getInterpolatedStyle } from '@/data/historicalEras';
 import { GenerationStrategy } from '@/utils/generation/GenerationStrategy';
 
@@ -657,7 +657,7 @@ export const useCastleStore = create<CastleState>((set, get) => ({
         if (!state.lockedParams.has('seed') && result.params.seed !== undefined) {
           newParams.seed = result.params.seed;
         }
-        return { params: newParams };
+        return { params: newParams, generationMetadata: result.metadata };
       }
 
       let newParams = { ...state.params };
@@ -703,7 +703,7 @@ export const useCastleStore = create<CastleState>((set, get) => ({
         newParams.moatWaterParams.isAnimated = Math.random() > 0.2;
       }
 
-      return { params: newParams };
+      return { params: newParams, generationMetadata: null };
     }),
   lockAllParams: () =>
     set((state) => {
@@ -777,12 +777,16 @@ export const useCastleStore = create<CastleState>((set, get) => ({
         params: newParams,
         evolutionStats: evolutionResult
           ? {
-              generation: evolutionResult.generation,
-              bestFitness: evolutionResult.bestIndividual.fitness,
-              avgFitness: evolutionResult.avgFitnessHistory[evolutionResult.avgFitnessHistory.length - 1] ?? 0,
+              generation: (evolutionResult as any).generation,
+              bestFitness: (evolutionResult as any).bestIndividual.fitness,
+              avgFitness: ((evolutionResult as any).avgFitnessHistory[(evolutionResult as any).avgFitnessHistory.length - 1]) ?? 0,
             }
           : null,
+        generationMetadata: result.metadata,
       };
     }),
   evolutionStats: null,
+  generationMetadata: null,
+  setGenerationMetadata: (metadata: GenerationMetadata | null) =>
+    set({ generationMetadata: metadata }),
 }));

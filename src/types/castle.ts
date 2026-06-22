@@ -512,6 +512,30 @@ export interface RoomTemplate {
 
 export type GenerationAlgorithm = 'rule_based' | 'lsystem' | 'cellular_automata' | 'evolutionary';
 
+export interface LSystemSegment {
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  depth: number;
+  type: 'wall' | 'tower' | 'moat' | 'gate';
+}
+
+export interface CABuildingPosition {
+  row: number;
+  col: number;
+  cluster: number;
+}
+
+export interface GenerationMetadata {
+  lsystemSegments?: LSystemSegment[];
+  caBuildingPositions?: CABuildingPosition[];
+  caTerrainMap?: number[][];
+  caWallMap?: boolean[][];
+  caGridSize?: number;
+  evolutionResult?: unknown;
+}
+
 export const GENERATION_ALGORITHM_INFO: Record<GenerationAlgorithm, { name: string; icon: string; description: string }> = {
   rule_based: {
     name: '规则生成',
@@ -691,4 +715,6 @@ export interface CastleState {
   updateEvolutionConfig: (updates: Partial<EvolutionConfig>) => void;
   runEvolution: () => void;
   evolutionStats: { generation: number; bestFitness: number; avgFitness: number } | null;
+  generationMetadata: GenerationMetadata | null;
+  setGenerationMetadata: (metadata: GenerationMetadata | null) => void;
 }

@@ -1,5 +1,5 @@
 import { SeededRandom } from '@/utils/seededRandom';
-import { CellularAutomataConfig, CastleParams, DEFAULT_CELLULAR_AUTOMATA_CONFIG } from '@/types/castle';
+import { CellularAutomataConfig, CastleParams, DEFAULT_CELLULAR_AUTOMATA_CONFIG, CABuildingPosition } from '@/types/castle';
 
 export interface CAGrid {
   width: number;
@@ -9,7 +9,7 @@ export interface CAGrid {
 
 export interface CAResult {
   grid: CAGrid;
-  buildingPositions: { row: number; col: number; cluster: number }[];
+  buildingPositions: CABuildingPosition[];
   terrainMap: number[][];
   wallMap: boolean[][];
 }
@@ -114,11 +114,11 @@ export class CellularAutomataEngine {
     return map;
   }
 
-  private findBuildingClusters(grid: boolean[][]): { row: number; col: number; cluster: number }[] {
+  private findBuildingClusters(grid: boolean[][]): CABuildingPosition[] {
     const visited: boolean[][] = Array.from({ length: this.config.gridSize }, () =>
       Array(this.config.gridSize).fill(false)
     );
-    const positions: { row: number; col: number; cluster: number }[] = [];
+    const positions: CABuildingPosition[] = [];
     let clusterId = 0;
 
     const floodFill = (startY: number, startX: number): void => {

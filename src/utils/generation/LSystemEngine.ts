@@ -1,14 +1,5 @@
 import { SeededRandom } from '@/utils/seededRandom';
-import { LSystemConfig, CastleParams, DEFAULT_LSYSTEM_CONFIG } from '@/types/castle';
-
-export interface LSystemSegment {
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-  depth: number;
-  type: 'wall' | 'tower' | 'moat' | 'gate';
-}
+import { LSystemConfig, CastleParams, DEFAULT_LSYSTEM_CONFIG, LSystemSegment } from '@/types/castle';
 
 export class LSystemEngine {
   private rng: SeededRandom;
