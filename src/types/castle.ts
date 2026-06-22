@@ -38,6 +38,50 @@ export type WallStyle = 'medieval' | 'roman' | 'norman' | 'gothic' | 'crusader' 
 export type TerrainType = 'plain' | 'hills' | 'mountain';
 export type WeatherType = 'sunny' | 'rainy' | 'snowy' | 'foggy';
 export type NPCType = 'farmer' | 'soldier' | 'noble';
+export type BuildingType = 'main_keep' | 'great_hall' | 'chapel' | 'stable' | 'barracks';
+
+export const BUILDING_TYPE_INFO: Record<BuildingType, { name: string; icon: string; description: string; widthRatio: number; depthRatio: number; heightRatio: number }> = {
+  main_keep: {
+    name: '主堡',
+    icon: '🏰',
+    description: '城堡的核心防御建筑，领主居所，最高大坚固',
+    widthRatio: 1.3,
+    depthRatio: 1.3,
+    heightRatio: 1.6,
+  },
+  great_hall: {
+    name: '大厅',
+    icon: '🏛️',
+    description: '宴会与议事的主要场所，宽敞高大',
+    widthRatio: 1.5,
+    depthRatio: 1.0,
+    heightRatio: 1.2,
+  },
+  chapel: {
+    name: '教堂',
+    icon: '⛪',
+    description: '宗教礼拜场所，有尖顶装饰',
+    widthRatio: 0.8,
+    depthRatio: 1.2,
+    heightRatio: 1.4,
+  },
+  stable: {
+    name: '马厩',
+    icon: '🐴',
+    description: '饲养战马和牲畜的建筑，较低矮宽敞',
+    widthRatio: 1.2,
+    depthRatio: 0.9,
+    heightRatio: 0.7,
+  },
+  barracks: {
+    name: '兵营',
+    icon: '⚔️',
+    description: '士兵驻扎和训练的场所，规整坚固',
+    widthRatio: 1.4,
+    depthRatio: 0.8,
+    heightRatio: 0.9,
+  },
+};
 
 export const TOWER_TYPE_INFO: Record<TowerType, { name: string; icon: string; description: string }> = {
   basic: {
@@ -88,6 +132,10 @@ export interface TowerSpecificParams {
     archHeight: number;
     towerSpacing: number;
     portcullisHeight: number;
+    gatehouseDepth: number;
+    hasBattlements: boolean;
+    hasMurderHoles: boolean;
+    hasBarbican: boolean;
   };
 }
 
@@ -123,6 +171,10 @@ export const DEFAULT_TOWER_PARAMS: TowerSpecificParams = {
     archHeight: 6,
     towerSpacing: 8,
     portcullisHeight: 5,
+    gatehouseDepth: 6,
+    hasBattlements: true,
+    hasMurderHoles: true,
+    hasBarbican: false,
   },
 };
 
@@ -336,12 +388,19 @@ export interface CastleParams {
   portcullisPosition: number;
   drawbridgeAngle: number;
   hasDrawbridge: boolean;
+  hasGatehouse: boolean;
+  hasBarLatch: boolean;
+  barLatchPosition: number;
+  buildingTypeDistribution: Record<BuildingType, number>;
+  gateAnimationSync: boolean;
 }
 
 export interface CastleMeshData {
   walls: THREE.BufferGeometry[];
   towers: THREE.BufferGeometry[];
   gate: THREE.BufferGeometry;
+  gatehouse: THREE.BufferGeometry | null;
+  barLatch: THREE.BufferGeometry | null;
   moat: THREE.BufferGeometry | null;
   moatSegments: THREE.BufferGeometry[];
   water: THREE.BufferGeometry | null;
@@ -349,6 +408,7 @@ export interface CastleMeshData {
   drawbridge: THREE.BufferGeometry | null;
   portcullis: THREE.BufferGeometry | null;
   buildings: THREE.BufferGeometry[];
+  buildingTypes: BuildingType[];
   ground: THREE.BufferGeometry;
 }
 
@@ -423,4 +483,9 @@ export interface CastleState {
   updateMoatSegment: (segmentId: string, updates: Partial<MoatSegment>) => void;
   addMoatSegment: (segment: Omit<MoatSegment, 'id'>) => void;
   removeMoatSegment: (segmentId: string) => void;
+  setBarLatchPosition: (position: number) => void;
+  setBuildingTypeDistribution: (type: BuildingType, count: number) => void;
+  toggleGateAnimationSync: () => void;
+  openGateSequence: () => void;
+  closeGateSequence: () => void;
 }

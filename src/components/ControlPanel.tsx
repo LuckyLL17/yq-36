@@ -1,9 +1,9 @@
-import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock, Users, Layers, ChevronDown, ChevronUp, Anchor, Waves, TrendingUp } from 'lucide-react';
+import { Castle, Shield, Building2, Droplets, DoorOpen, Hash, Palette, Mountain, CloudSun, Clock, Users, Layers, ChevronDown, ChevronUp, Anchor, Waves, TrendingUp, Castle as CastleIcon, Lock, Unlink, Link2 } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { CollapsibleSection } from './CollapsibleSection';
 import { SliderControl } from './SliderControl';
 import { ToggleControl } from './ToggleControl';
-import { TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, NPC_TYPE_INFO, NPCType, WallStyle, WALL_STYLE_PRESETS, TowerType, TOWER_TYPE_INFO, MoatSegment } from '@/types/castle';
+import { TerrainType, TERRAIN_PRESETS, WeatherType, WEATHER_PRESETS, NPC_TYPE_INFO, NPCType, WallStyle, WALL_STYLE_PRESETS, TowerType, TOWER_TYPE_INFO, MoatSegment, BuildingType, BUILDING_TYPE_INFO } from '@/types/castle';
 
 function formatTime(hours: number): string {
   const h = Math.floor(hours);
@@ -33,6 +33,11 @@ export function ControlPanel() {
     setDrawbridgeAngle,
     setPortcullisPosition,
     updateMoatSegment,
+    setBarLatchPosition,
+    setBuildingTypeDistribution,
+    toggleGateAnimationSync,
+    openGateSequence,
+    closeGateSequence,
   } = useCastleStore();
 
   return (
@@ -496,6 +501,112 @@ export function ControlPanel() {
             onChange={(v) => setParams({ gateHeight: v })}
             unit="m"
           />
+          <div className="mt-3 pt-3 border-t border-stone-700/50">
+            <ToggleControl
+              label="启用门楼结构"
+              checked={params.hasGatehouse}
+              onChange={(v) => setParams({ hasGatehouse: v })}
+            />
+          </div>
+          {params.hasGatehouse && params.towerType === 'gatehouse' && (
+            <div className="mt-2 p-2 bg-amber-900/20 rounded-lg border border-amber-800/30">
+              <p className="text-xs text-amber-300 font-medium mb-2">门楼参数</p>
+              <SliderControl
+                label="门楼深度"
+                value={params.towerSpecificParams.gatehouse.gatehouseDepth}
+                min={3}
+                max={12}
+                step={0.5}
+                onChange={(v) => updateTowerSpecificParams('gatehouse', { gatehouseDepth: v })}
+                unit="m"
+              />
+              <ToggleControl
+                label="顶部城垛"
+                checked={params.towerSpecificParams.gatehouse.hasBattlements}
+                onChange={(v) => updateTowerSpecificParams('gatehouse', { hasBattlements: v })}
+              />
+              <ToggleControl
+                label="谋杀洞"
+                checked={params.towerSpecificParams.gatehouse.hasMurderHoles}
+                onChange={(v) => updateTowerSpecificParams('gatehouse', { hasMurderHoles: v })}
+              />
+              <ToggleControl
+                label="外堡 (Barbican)"
+                checked={params.towerSpecificParams.gatehouse.hasBarbican}
+                onChange={(v) => updateTowerSpecificParams('gatehouse', { hasBarbican: v })}
+              />
+            </div>
+          )}
+          <div className="mt-3 pt-3 border-t border-stone-700/50">
+            <ToggleControl
+              label="门后闩锁"
+              checked={params.hasBarLatch}
+              onChange={(v) => setParams({ hasBarLatch: v })}
+            />
+          </div>
+          {params.hasBarLatch && (
+            <div className="mt-2">
+              <div className="flex justify-between items-center text-xs mb-1">
+                <label className="text-stone-300">闩锁位置</label>
+                <span className="text-amber-400 font-mono">{Math.round(params.barLatchPosition * 100)}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.02}
+                value={params.barLatchPosition}
+                onChange={(e) => setBarLatchPosition(parseFloat(e.target.value))}
+                className="w-full h-2 rounded-full appearance-none cursor-pointer
+                  [&::-webkit-slider-thumb]:appearance-none
+                  [&::-webkit-slider-thumb]:w-4
+                  [&::-webkit-slider-thumb]:h-4
+                  [&::-webkit-slider-thumb]:rounded-full
+                  [&::-webkit-slider-thumb]:bg-amber-500
+                  [&::-webkit-slider-thumb]:cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, #78350f 0%, #f59e0b ${params.barLatchPosition * 100}%, #78716c ${params.barLatchPosition * 100}%, #57534e 100%)`,
+                }}
+              />
+            </div>
+          )}
+          <div className="mt-3 pt-3 border-t border-stone-700/50">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <Link2 className="w-3.5 h-3.5 text-teal-400" />
+                <span className="text-xs text-stone-300">联动动画</span>
+              </div>
+              <button
+                onClick={toggleGateAnimationSync}
+                className={`px-2 py-1 rounded text-[10px] font-medium transition-colors ${
+                  params.gateAnimationSync
+                    ? 'bg-teal-600/30 text-teal-300 border border-teal-500'
+                    : 'bg-stone-700/50 text-stone-400 border border-stone-600'
+                }`}
+              >
+                {params.gateAnimationSync ? '已同步' : '未同步'}
+              </button>
+            </div>
+            {params.gateAnimationSync && (
+              <div className="grid grid-cols-2 gap-1.5 mt-2">
+                <button
+                  onClick={openGateSequence}
+                  className="px-2 py-1.5 bg-emerald-700/40 hover:bg-emerald-600/40 border border-emerald-600/50 rounded text-[10px] text-emerald-200 transition-colors"
+                >
+                  ▶ 开门序列
+                </button>
+                <button
+                  onClick={closeGateSequence}
+                  className="px-2 py-1.5 bg-red-700/40 hover:bg-red-600/40 border border-red-600/50 rounded text-[10px] text-red-200 transition-colors"
+                >
+                  ▶ 关门序列
+                </button>
+              </div>
+            )}
+            <p className="text-[10px] text-stone-500 italic mt-1.5">
+              同步后：闩锁→铁闸门→吊桥 依次联动
+            </p>
+          </div>
         </CollapsibleSection>
 
         <CollapsibleSection title="护城河系统" icon={<Droplets className="w-4 h-4" />} defaultOpen>
@@ -735,16 +846,7 @@ export function ControlPanel() {
 
         <CollapsibleSection title="内部建筑" icon={<Building2 className="w-4 h-4" />}>
           <SliderControl
-            label="建筑数量"
-            value={params.buildingCount}
-            min={1}
-            max={15}
-            step={1}
-            onChange={(v) => setParams({ buildingCount: v })}
-            unit="栋"
-          />
-          <SliderControl
-            label="建筑高度"
+            label="基础高度"
             value={params.buildingHeight}
             min={3}
             max={15}
@@ -752,6 +854,47 @@ export function ControlPanel() {
             onChange={(v) => setParams({ buildingHeight: v })}
             unit="m"
           />
+          <div className="mt-3 space-y-2">
+            <p className="text-xs text-stone-400">建筑类型分布</p>
+            {(Object.keys(BUILDING_TYPE_INFO) as BuildingType[]).map((type) => {
+              const info = BUILDING_TYPE_INFO[type];
+              const count = params.buildingTypeDistribution[type];
+              return (
+                <div
+                  key={type}
+                  className="p-2 bg-stone-800/50 rounded border border-stone-700/50"
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base">{info.icon}</span>
+                      <span className="text-xs text-stone-200 font-medium">{info.name}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => setBuildingTypeDistribution(type, count - 1)}
+                        className="w-5 h-5 flex items-center justify-center bg-stone-700 hover:bg-stone-600 rounded text-stone-300 text-xs transition-colors"
+                      >
+                        −
+                      </button>
+                      <span className="w-6 text-center text-xs text-amber-400 font-mono">{count}</span>
+                      <button
+                        onClick={() => setBuildingTypeDistribution(type, count + 1)}
+                        className="w-5 h-5 flex items-center justify-center bg-stone-700 hover:bg-stone-600 rounded text-stone-300 text-xs transition-colors"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-stone-500 italic leading-tight">
+                    {info.description}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+          <p className="text-[10px] text-stone-500 italic mt-2">
+            提示：建筑会按尺寸从大到小自动排布，避免重叠
+          </p>
         </CollapsibleSection>
 
         <CollapsibleSection title="居民模式" icon={<Users className="w-4 h-4" />}>

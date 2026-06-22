@@ -1,7 +1,7 @@
-import { useMemo, useRef, useEffect } from 'react';
+import { useMemo, useRef, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { CastleParams, ViewMode } from '@/types/castle';
+import { CastleParams, ViewMode, BuildingType } from '@/types/castle';
 import { CastleGenerator } from '@/utils/CastleGenerator';
 import { MaterialFactory } from '@/utils/MaterialFactory';
 import { UVUnwrapper, UVIsland } from '@/utils/UVUnwrapper';
@@ -18,7 +18,12 @@ export function Castle({ params, viewMode }: CastleProps) {
   const waterRef = useRef<THREE.Mesh>(null);
   const waterSegmentsRef = useRef<THREE.Group>(null);
   const drawbridgeRef = useRef<THREE.Group>(null);
+  const portcullisRef = useRef<THREE.Group>(null);
+  const barLatchRef = useRef<THREE.Group>(null);
   const setCastleGeometries = useCastleStore((state) => state.setCastleGeometries);
+  const [animProgress, setAnimProgress] = useState(0);
+  const animTargetRef = useRef(0);
+  const animCurrentRef = useRef(0);
 
   const generatorData = useMemo(() => {
     const generator = new CastleGenerator(params);
@@ -43,6 +48,11 @@ export function Castle({ params, viewMode }: CastleProps) {
     const gateUvGeo = result.gate.clone();
     islands.push(UVUnwrapper.unwrapGeometry(gateUvGeo, 'gate'));
     uvGeos.push(gateUvGeo);
+    if (result.gatehouse) {
+      const gatehouseUvGeo = result.gatehouse.clone();
+      islands.push(UVUnwrapper.unwrapGeometry(gatehouseUvGeo, 'gatehouse'));
+      uvGeos.push(gatehouseUvGeo);
+    }
     if (result.moat) {
       const moatUvGeo = result.moat.clone();
       islands.push(UVUnwrapper.unwrapGeometry(moatUvGeo, 'moat'));
@@ -60,13 +70,15 @@ export function Castle({ params, viewMode }: CastleProps) {
     return { ...result, uvGeometries: uvGeos };
   }, [params]);
 
-  const { walls, towers, gate, moat, moatSegments, water, waterSegments, drawbridge, portcullis, buildings, ground, uvGeometries } = generatorData;
+  const { walls, towers, gate, gatehouse, barLatch, moat, moatSegments, water, waterSegments, drawbridge, portcullis, buildings, buildingTypes, ground, uvGeometries } = generatorData;
 
   useEffect(() => {
     setCastleGeometries({
       walls,
       towers,
       gate,
+      gatehouse,
+      barLatch,
       moat,
       moatSegments,
       water,
@@ -74,9 +86,10 @@ export function Castle({ params, viewMode }: CastleProps) {
       drawbridge,
       portcullis,
       buildings,
+      buildingTypes,
       ground,
     });
-  }, [walls, towers, gate, moat, moatSegments, water, waterSegments, drawbridge, portcullis, buildings, ground, setCastleGeometries]);
+  }, [walls, towers, gate, gatehouse, barLatch, moat, moatSegments, water, waterSegments, drawbridge, portcullis, buildings, buildingTypes, ground, setCastleGeometries]);
 
   const getMaterial = (type: 'stone' | 'wood' | 'roof' | 'ground' | 'water' | 'metal') => {
     if (viewMode === 'wireframe') {
@@ -106,7 +119,7 @@ export function Castle({ params, viewMode }: CastleProps) {
     }
   };
 
-  useFrame((state) => {
+  useFrame((state, delta) => {
     if (groupRef.current && viewMode === 'solid') {
       groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.1) * 0.02;
     }
@@ -158,8 +171,39 @@ export function Castle({ params, viewMode }: CastleProps) {
       });
     }
 
-    if (drawbridgeRef.current) {
-      drawbridgeRef.current.rotation.x = -params.drawbridgeAngle * (Math.PI / 180);
+    if (params.gateAnimationSync) {
+      const speed = 0.3;
+      const target = params.drawbridgeAngle > 0 ? 1 : 0;
+      animTargetRef.current = target;
+      
+      const diff = animTargetRef.current - animCurrentRef.current;
+      if (Math.abs(diff) > 0.001) {
+        animCurrentRef.current += diff * speed * delta * 2;
+        animCurrentRef.current = Math.max(0, Math.min(1, animCurrentRef.current));
+        setAnimProgress(animCurrentRef.current);
+      }
+      
+      const p = animCurrentRef.current;
+      
+      if (drawbridgeRef.current) {
+        const bridgeAngle = Math.max(0, (p - 0.4) / 0.6) * 75;
+        drawbridgeRef.current.rotation.x = -bridgeAngle * (Math.PI / 180);
+      }
+      
+      if (portcullisRef.current) {
+        const portcullisP = Math.max(0, (p - 0.2) / 0.5);
+        portcullisRef.current.position.y = portcullisP * params.gateHeight * 0.9;
+      }
+      
+      if (barLatchRef.current) {
+        const latchP = Math.max(0, p / 0.2);
+        barLatchRef.current.position.x = latchP * 1.5;
+      }
+    } else {
+      if (drawbridgeRef.current) {
+        drawbridgeRef.current.rotation.x = -params.drawbridgeAngle * (Math.PI / 180);
+      }
+      animCurrentRef.current = params.drawbridgeAngle / 75;
     }
   });
 
@@ -184,9 +228,25 @@ export function Castle({ params, viewMode }: CastleProps) {
     return <mesh geometry={geo} material={getMaterial('wood')} castShadow receiveShadow name="gate" />;
   };
 
+  const renderGatehouse = () => {
+    if (!gatehouse) return null;
+    const idx = walls.length + towers.length + 1;
+    const geo = viewMode === 'uv' ? uvGeometries[idx] : gatehouse;
+    return <mesh geometry={geo} material={getMaterial('stone')} castShadow receiveShadow name="gatehouse" />;
+  };
+
+  const renderBarLatch = () => {
+    if (!barLatch) return null;
+    return (
+      <group ref={barLatchRef} name="bar_latch_group">
+        <mesh geometry={barLatch} material={getMaterial('wood')} castShadow receiveShadow name="bar_latch" />
+      </group>
+    );
+  };
+
   const renderMoat = () => {
     if (!moat) return null;
-    const idx = walls.length + towers.length + 1;
+    const idx = walls.length + towers.length + 1 + (gatehouse ? 1 : 0);
     const geo = viewMode === 'uv' ? uvGeometries[idx] : moat;
     return <mesh geometry={geo} material={getMaterial('ground')} receiveShadow name="moat" />;
   };
@@ -225,14 +285,18 @@ export function Castle({ params, viewMode }: CastleProps) {
 
   const renderPortcullis = () => {
     if (!portcullis) return null;
-    return <mesh geometry={portcullis} material={getMaterial('metal')} castShadow receiveShadow name="portcullis" />;
+    return (
+      <group ref={portcullisRef} name="portcullis_group">
+        <mesh geometry={portcullis} material={getMaterial('metal')} castShadow receiveShadow name="portcullis" />
+      </group>
+    );
   };
 
   const renderBuildings = () => {
-    const startIdx = walls.length + towers.length + 1 + (moat ? 1 : 0);
+    const startIdx = walls.length + towers.length + 1 + (gatehouse ? 1 : 0) + (moat ? 1 : 0);
     const geos = viewMode === 'uv' ? uvGeometries.slice(startIdx, startIdx + buildings.length) : buildings;
     return geos.map((geo, i) => (
-      <mesh key={`building_${i}`} geometry={geo} material={getMaterial('stone')} castShadow receiveShadow name={`building_${i}`} />
+      <mesh key={`building_${i}`} geometry={geo} material={getMaterial('stone')} castShadow receiveShadow name={`building_${buildingTypes[i] || i}`} />
     ));
   };
 
@@ -241,12 +305,14 @@ export function Castle({ params, viewMode }: CastleProps) {
       {renderWalls()}
       {renderTowers()}
       {renderGate()}
+      {renderGatehouse()}
       {renderMoat()}
       {renderMoatSegments()}
       {renderWater()}
       {renderWaterSegments()}
       {renderDrawbridge()}
       {renderPortcullis()}
+      {renderBarLatch()}
       {renderBuildings()}
       <mesh geometry={ground} material={getMaterial('ground')} receiveShadow name="ground" />
     </group>

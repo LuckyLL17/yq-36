@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WallStyle, WALL_STYLE_PRESETS, TowerType, DEFAULT_TOWER_PARAMS, DEFAULT_MOAT_WATER_PARAMS, MoatSegment, TowerSpecificParams } from '@/types/castle';
+import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WallStyle, WALL_STYLE_PRESETS, TowerType, DEFAULT_TOWER_PARAMS, DEFAULT_MOAT_WATER_PARAMS, MoatSegment, TowerSpecificParams, BuildingType } from '@/types/castle';
 import { getInterpolatedStyle } from '@/data/historicalEras';
 
 function generateDefaultMoatSegments(): MoatSegment[] {
@@ -50,6 +50,17 @@ const baseParams: CastleParams = {
   portcullisPosition: 0,
   drawbridgeAngle: 0,
   hasDrawbridge: true,
+  hasGatehouse: true,
+  hasBarLatch: true,
+  barLatchPosition: 0,
+  buildingTypeDistribution: {
+    main_keep: 1,
+    great_hall: 1,
+    chapel: 1,
+    stable: 1,
+    barracks: 2,
+  },
+  gateAnimationSync: false,
 };
 
 function buildDefaultParams(): CastleParams {
@@ -426,6 +437,46 @@ export const useCastleStore = create<CastleState>((set, get) => ({
       params: {
         ...state.params,
         moatSegments: state.params.moatSegments.filter((seg) => seg.id !== segmentId),
+      },
+    })),
+  setBarLatchPosition: (position: number) =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        barLatchPosition: position,
+      },
+    })),
+  setBuildingTypeDistribution: (type: BuildingType, count: number) =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        buildingTypeDistribution: {
+          ...state.params.buildingTypeDistribution,
+          [type]: Math.max(0, count),
+        },
+      },
+    })),
+  toggleGateAnimationSync: () =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        gateAnimationSync: !state.params.gateAnimationSync,
+      },
+    })),
+  openGateSequence: () =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        drawbridgeAngle: 75,
+        gateAnimationSync: true,
+      },
+    })),
+  closeGateSequence: () =>
+    set((state) => ({
+      params: {
+        ...state.params,
+        drawbridgeAngle: 0,
+        gateAnimationSync: true,
       },
     })),
 }));
