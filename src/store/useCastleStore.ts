@@ -279,6 +279,28 @@ function setNestedValue(obj: any, path: string, value: any): any {
   return result;
 }
 
+function runAlgorithmGeneration(
+  params: CastleParams,
+  forceAlgorithm?: GenerationAlgorithm
+): { params: Partial<CastleParams>; metadata: GenerationMetadata } {
+  const algorithm = forceAlgorithm ?? params.generationAlgorithm;
+
+  if (algorithm === 'rule_based') {
+    return { params: {}, metadata: {} };
+  }
+
+  const strategy = new GenerationStrategy(params.seed);
+  const result = strategy.generate(
+    algorithm,
+    params,
+    params.lsystemConfig,
+    params.cellularAutomataConfig,
+    params.evolutionConfig
+  );
+
+  return { params: result.params, metadata: result.metadata };
+}
+
 export const useCastleStore = create<CastleState>((set, get) => ({
   params: defaultParams,
   viewMode: 'solid',
@@ -645,14 +667,7 @@ export const useCastleStore = create<CastleState>((set, get) => ({
       const algorithm = state.params.generationAlgorithm;
 
       if (algorithm !== 'rule_based') {
-        const strategy = new GenerationStrategy(state.params.seed);
-        const result = strategy.generate(
-          algorithm,
-          state.params,
-          state.params.lsystemConfig,
-          state.params.cellularAutomataConfig,
-          state.params.evolutionConfig
-        );
+        const result = runAlgorithmGeneration(state.params);
         const newParams = { ...state.params, ...result.params };
         if (!state.lockedParams.has('seed') && result.params.seed !== undefined) {
           newParams.seed = result.params.seed;
@@ -725,56 +740,56 @@ export const useCastleStore = create<CastleState>((set, get) => ({
       lockedParams: new Set<string>(),
     })),
   setGenerationAlgorithm: (algorithm: GenerationAlgorithm) =>
-    set((state) => ({
-      params: {
-        ...state.params,
-        generationAlgorithm: algorithm,
-      },
-    })),
+    set((state) => {
+      const newParams = { ...state.params, generationAlgorithm: algorithm };
+      if (algorithm === 'rule_based') {
+        return { params: newParams, generationMetadata: null };
+      }
+      const result = runAlgorithmGeneration(newParams);
+      return {
+        params: { ...newParams, ...result.params },
+        generationMetadata: result.metadata,
+      };
+    }),
   updateLSystemConfig: (updates: Partial<LSystemConfig>) =>
-    set((state) => ({
-      params: {
-        ...state.params,
-        lsystemConfig: {
-          ...state.params.lsystemConfig,
-          ...updates,
-        },
-      },
-    })),
+    set((state) => {
+      const newConfig = { ...state.params.lsystemConfig, ...updates };
+      const newParams = { ...state.params, lsystemConfig: newConfig };
+      if (state.params.generationAlgorithm !== 'lsystem') {
+        return { params: newParams };
+      }
+      const result = runAlgorithmGeneration(newParams);
+      return {
+        params: { ...newParams, ...result.params },
+        generationMetadata: result.metadata,
+      };
+    }),
   updateCellularAutomataConfig: (updates: Partial<CellularAutomataConfig>) =>
-    set((state) => ({
-      params: {
-        ...state.params,
-        cellularAutomataConfig: {
-          ...state.params.cellularAutomataConfig,
-          ...updates,
-        },
-      },
-    })),
+    set((state) => {
+      const newConfig = { ...state.params.cellularAutomataConfig, ...updates };
+      const newParams = { ...state.params, cellularAutomataConfig: newConfig };
+      if (state.params.generationAlgorithm !== 'cellular_automata') {
+        return { params: newParams };
+      }
+      const result = runAlgorithmGeneration(newParams);
+      return {
+        params: { ...newParams, ...result.params },
+        generationMetadata: result.metadata,
+      };
+    }),
   updateEvolutionConfig: (updates: Partial<EvolutionConfig>) =>
     set((state) => ({
       params: {
         ...state.params,
-        evolutionConfig: {
-          ...state.params.evolutionConfig,
-          ...updates,
-        },
+        evolutionConfig: { ...state.params.evolutionConfig, ...updates },
       },
     })),
   runEvolution: () =>
     set((state) => {
-      const strategy = new GenerationStrategy(state.params.seed);
-      const result = strategy.generate(
-        'evolutionary',
-        state.params,
-        state.params.lsystemConfig,
-        state.params.cellularAutomataConfig,
-        state.params.evolutionConfig
-      );
+      const result = runAlgorithmGeneration(state.params, 'evolutionary');
       const evolutionResult = result.metadata.evolutionResult;
-      const newParams = { ...state.params, ...result.params };
       return {
-        params: newParams,
+        params: { ...state.params, ...result.params },
         evolutionStats: evolutionResult
           ? {
               generation: (evolutionResult as any).generation,

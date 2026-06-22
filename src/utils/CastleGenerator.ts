@@ -1,18 +1,51 @@
 import * as THREE from 'three';
-import { CastleParams, CrenellationStyle, TowerShape, TowerType, BuildingType, BUILDING_TYPE_INFO, GenerationMetadata, LSystemSegment } from '@/types/castle';
+import { CastleParams, CrenellationStyle, TowerShape, TowerType, BuildingType, BUILDING_TYPE_INFO, GenerationMetadata } from '@/types/castle';
 import { SeededRandom } from '@/utils/seededRandom';
+import { LSystemGeometryAdapter } from '@/utils/generation/LSystemGeometryAdapter';
+import { CAGeometryAdapter } from '@/utils/generation/CAGeometryAdapter';
 
 export class CastleGenerator {
   private params: CastleParams;
   private rng: SeededRandom;
   private noisePerm: number[];
   private metadata: GenerationMetadata | null;
+  private lsystemAdapter: LSystemGeometryAdapter | null = null;
+  private caAdapter: CAGeometryAdapter | null = null;
 
   constructor(params: CastleParams, metadata: GenerationMetadata | null = null) {
     this.params = params;
     this.rng = new SeededRandom(params.seed);
     this.noisePerm = this.buildNoisePermutation();
     this.metadata = metadata;
+    this.initAdapters();
+  }
+
+  private initAdapters() {
+    if (!this.metadata) return;
+
+    if (this.metadata.lsystemSegments && this.metadata.lsystemSegments.length > 0) {
+      this.lsystemAdapter = new LSystemGeometryAdapter(
+        this.metadata.lsystemSegments,
+        this.params.plotWidth,
+        this.params.plotDepth,
+        this.rng
+      );
+    }
+
+    if (this.metadata.caTerrainMap && this.metadata.caBuildingPositions) {
+      const gridSize = this.metadata.caGridSize ?? this.params.cellularAutomataConfig?.gridSize ?? 32;
+      this.caAdapter = new CAGeometryAdapter(
+        this.metadata.caTerrainMap,
+        this.metadata.caBuildingPositions,
+        gridSize,
+        this.params.plotWidth,
+        this.params.plotDepth,
+        this.params.buildingHeight,
+        this.params.buildingTypeDistribution,
+        this.rng,
+        this.params.seed
+      );
+    }
   }
 
   private buildNoisePermutation(): number[] {
@@ -65,11 +98,9 @@ export class CastleGenerator {
   getTerrainHeight(x: number, z: number): number {
     const { terrainAmplitude, terrainFrequency, terrainScale } = this.params;
 
-    if (this.metadata?.caTerrainMap && this.metadata?.caGridSize) {
-      const caH = this.sampleCATerrain(x, z);
-      if (caH > 0) {
-        return caH * terrainAmplitude;
-      }
+    if (this.caAdapter) {
+      const caH = this.caAdapter.sampleTerrainHeight(x, z, terrainAmplitude);
+      if (caH > 0) return caH;
     }
 
     let total = 0;
@@ -89,24 +120,9 @@ export class CastleGenerator {
     return normalized * terrainAmplitude;
   }
 
-  private sampleCATerrain(x: number, z: number): number {
-    if (!this.metadata?.caTerrainMap || !this.metadata?.caGridSize) return 0;
-    const { plotWidth, plotDepth } = this.params;
-    const gridSize = this.metadata.caGridSize;
-    const terrainMap = this.metadata.caTerrainMap;
-
-    const nx = (x + plotWidth / 2) / plotWidth;
-    const nz = (z + plotDepth / 2) / plotDepth;
-    const col = Math.floor(nx * gridSize);
-    const row = Math.floor(nz * gridSize);
-
-    if (row < 0 || row >= gridSize || col < 0 || col >= gridSize) return 0;
-    return terrainMap[row][col] / 3.0;
-  }
-
   generatePlotPoints(): THREE.Vector2[] {
-    if (this.metadata?.lsystemSegments && this.metadata.lsystemSegments.length > 0) {
-      return this.generatePlotPointsFromLSystem();
+    if (this.lsystemAdapter) {
+      return this.lsystemAdapter.generatePlotPoints();
     }
 
     const { plotWidth, plotDepth } = this.params;
@@ -121,89 +137,6 @@ export class CastleGenerator {
       points.push(new THREE.Vector2(x, y));
     }
     
-    return points;
-  }
-
-  private generatePlotPointsFromLSystem(): THREE.Vector2[] {
-    const segments = this.metadata!.lsystemSegments!;
-    const wallSegs = segments.filter(s => s.type === 'wall' || s.type === 'gate');
-
-    if (wallSegs.length < 3) {
-      return this.fallbackPlotPoints();
-    }
-
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const seg of wallSegs) {
-      minX = Math.min(minX, seg.startX, seg.endX);
-      maxX = Math.max(maxX, seg.startX, seg.endX);
-      minY = Math.min(minY, seg.startY, seg.endY);
-      maxY = Math.max(maxY, seg.startY, seg.endY);
-    }
-
-    const spanX = Math.max(1, maxX - minX);
-    const spanY = Math.max(1, maxY - minY);
-    const { plotWidth, plotDepth } = this.params;
-    const scaleX = plotWidth / spanX;
-    const scaleY = plotDepth / spanY;
-    const scale = Math.min(scaleX, scaleY) * 0.9;
-    const offX = -(minX + maxX) / 2;
-    const offY = -(minY + maxY) / 2;
-
-    const endpointSet = new Map<string, { x: number; y: number; count: number }>();
-    for (const seg of wallSegs) {
-      const sKey = `${seg.startX.toFixed(2)}_${seg.startY.toFixed(2)}`;
-      const eKey = `${seg.endX.toFixed(2)}_${seg.endY.toFixed(2)}`;
-      for (const [key, px, py] of [[sKey, seg.startX, seg.startY], [eKey, seg.endX, seg.endY]] as const) {
-        const existing = endpointSet.get(key);
-        if (existing) {
-          existing.count++;
-        } else {
-          endpointSet.set(key, { x: px, y: py, count: 1 });
-        }
-      }
-    }
-
-    const junctions = Array.from(endpointSet.values())
-      .filter(p => p.count >= 2 || this.rng.next() < 0.3)
-      .map(p => new THREE.Vector2(
-        (p.x + offX) * scale,
-        (p.y + offY) * scale
-      ));
-
-    if (junctions.length < 3) {
-      return this.fallbackPlotPoints();
-    }
-
-    const centerX = junctions.reduce((s, p) => s + p.x, 0) / junctions.length;
-    const centerY = junctions.reduce((s, p) => s + p.y, 0) / junctions.length;
-    junctions.sort((a, b) => {
-      const angA = Math.atan2(a.y - centerY, a.x - centerX);
-      const angB = Math.atan2(b.y - centerY, b.x - centerX);
-      return angA - angB;
-    });
-
-    const targetCount = Math.min(12, Math.max(4, Math.floor(junctions.length / 2)));
-    const result: THREE.Vector2[] = [];
-    const step = junctions.length / targetCount;
-    for (let i = 0; i < targetCount; i++) {
-      const idx = Math.floor(i * step) % junctions.length;
-      result.push(junctions[idx]);
-    }
-
-    return result;
-  }
-
-  private fallbackPlotPoints(): THREE.Vector2[] {
-    const { plotWidth, plotDepth } = this.params;
-    const points: THREE.Vector2[] = [];
-    for (let i = 0; i < 4; i++) {
-      const angle = (i / 4) * Math.PI * 2 - Math.PI / 2;
-      const wobble = 0.85 + this.rng.range(0, 0.3);
-      points.push(new THREE.Vector2(
-        Math.cos(angle) * (plotWidth / 2) * wobble,
-        Math.sin(angle) * (plotDepth / 2) * wobble
-      ));
-    }
     return points;
   }
 
@@ -338,10 +271,9 @@ export class CastleGenerator {
     const towers: THREE.BufferGeometry[] = [];
     const { towerCount, towerHeight, towerRadius, towerShape, towerType } = this.params;
 
-    if (this.metadata?.lsystemSegments) {
-      const towerSegs = this.metadata.lsystemSegments.filter(s => s.type === 'tower');
-      if (towerSegs.length > 0) {
-        const positions = this.scaleLSystemPoints(towerSegs);
+    if (this.lsystemAdapter) {
+      const positions = this.lsystemAdapter.getTowerPositions();
+      if (positions.length > 0) {
         const maxTowers = Math.min(towerCount, positions.length);
         for (let i = 0; i < maxTowers; i++) {
           const pos = positions[i];
@@ -379,27 +311,6 @@ export class CastleGenerator {
     }
 
     return towers;
-  }
-
-  private scaleLSystemPoints(segments: LSystemSegment[]): THREE.Vector2[] {
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const seg of segments) {
-      minX = Math.min(minX, seg.startX, seg.endX);
-      maxX = Math.max(maxX, seg.startX, seg.endX);
-      minY = Math.min(minY, seg.startY, seg.endY);
-      maxY = Math.max(maxY, seg.startY, seg.endY);
-    }
-    const spanX = Math.max(1, maxX - minX);
-    const spanY = Math.max(1, maxY - minY);
-    const { plotWidth, plotDepth } = this.params;
-    const scale = Math.min(plotWidth / spanX, plotDepth / spanY) * 0.85;
-    const offX = -(minX + maxX) / 2;
-    const offY = -(minY + maxY) / 2;
-
-    return segments.map(seg => new THREE.Vector2(
-      ((seg.startX + seg.endX) / 2 + offX) * scale,
-      ((seg.startY + seg.endY) / 2 + offY) * scale
-    ));
   }
 
   private createTowerByType(
@@ -1460,8 +1371,8 @@ export class CastleGenerator {
     const minZ = innerBounds.minY + 3;
     const maxZ = innerBounds.maxY - 3;
 
-    if (this.metadata?.caBuildingPositions && this.metadata.caBuildingPositions.length > 0) {
-      return this.getBuildingPositionsFromCA(minX, maxX, minZ, maxZ);
+    if (this.caAdapter) {
+      return this.caAdapter.getBuildingPlacements(minX, maxX, minZ, maxZ);
     }
 
     const buildingList: { type: BuildingType; count: number }[] = [];
@@ -1511,82 +1422,6 @@ export class CastleGenerator {
           }
           attempts++;
         }
-      }
-    }
-
-    return positions;
-  }
-
-  private getBuildingPositionsFromCA(
-    minX: number,
-    maxX: number,
-    minZ: number,
-    maxZ: number
-  ): { x: number; z: number; width: number; depth: number; height: number; type: BuildingType }[] {
-    const positions: { x: number; z: number; width: number; depth: number; height: number; type: BuildingType }[] = [];
-    const { buildingHeight, buildingTypeDistribution } = this.params;
-    const caPositions = this.metadata!.caBuildingPositions!;
-    const gridSize = this.metadata!.caGridSize ?? this.params.cellularAutomataConfig?.gridSize ?? 32;
-
-    const buildingList: { type: BuildingType; count: number }[] = [];
-    (Object.keys(buildingTypeDistribution) as BuildingType[]).forEach((type) => {
-      const count = Math.max(0, Math.floor(buildingTypeDistribution[type]));
-      if (count > 0) {
-        buildingList.push({ type, count });
-      }
-    });
-    buildingList.sort((a, b) => {
-      const sizeA = BUILDING_TYPE_INFO[a.type].widthRatio * BUILDING_TYPE_INFO[a.type].depthRatio;
-      const sizeB = BUILDING_TYPE_INFO[b.type].widthRatio * BUILDING_TYPE_INFO[b.type].depthRatio;
-      return sizeB - sizeA;
-    });
-
-    const buildingRng = new SeededRandom(this.params.seed + 7777);
-    const placed: { x: number; z: number; w: number; d: number }[] = [];
-    const worldW = maxX - minX;
-    const worldD = maxZ - minZ;
-
-    const sorted = [...caPositions].sort((a, b) => b.cluster - a.cluster);
-    const maxBuildings = Math.min(sorted.length, buildingList.reduce((s, b) => s + b.count, 0));
-
-    let typeIndex = 0;
-    let typeCountLeft = buildingList[0]?.count ?? 0;
-
-    for (let i = 0; i < maxBuildings; i++) {
-      if (buildingList.length === 0) break;
-
-      while (typeCountLeft <= 0 && typeIndex < buildingList.length - 1) {
-        typeIndex++;
-        typeCountLeft = buildingList[typeIndex].count;
-      }
-      if (typeCountLeft <= 0) break;
-
-      const type = buildingList[typeIndex].type;
-      const info = BUILDING_TYPE_INFO[type];
-      const cp = sorted[i];
-
-      const nx = cp.col / gridSize;
-      const nz = cp.row / gridSize;
-      const baseX = minX + nx * worldW;
-      const baseZ = minZ + nz * worldD;
-
-      const baseW = 4 + buildingRng.range(0, 2);
-      const baseD = 4 + buildingRng.range(0, 2);
-      const w = baseW * info.widthRatio;
-      const d = baseD * info.depthRatio;
-      const h = buildingHeight * info.heightRatio * (0.9 + buildingRng.range(0, 0.2));
-      const x = Math.min(maxX - w / 2, Math.max(minX + w / 2, baseX));
-      const z = Math.min(maxZ - d / 2, Math.max(minZ + d / 2, baseZ));
-
-      const overlap = placed.some((p) =>
-        Math.abs(p.x - x) < (p.w + w) / 2 + 1.5 &&
-        Math.abs(p.z - z) < (p.d + d) / 2 + 1.5
-      );
-
-      if (!overlap) {
-        positions.push({ x, z, width: w, depth: d, height: h, type });
-        placed.push({ x, z, w, d });
-        typeCountLeft--;
       }
     }
 
