@@ -1,7 +1,7 @@
 import { useMemo, useRef, useEffect, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { CastleParams, ViewMode, BuildingType } from '@/types/castle';
+import { CastleParams, ViewMode, UVMappingMode } from '@/types/castle';
 import { CastleGenerator } from '@/utils/CastleGenerator';
 import { MaterialFactory } from '@/utils/MaterialFactory';
 import { UVUnwrapper, UVIsland } from '@/utils/UVUnwrapper';
@@ -21,7 +21,9 @@ export function Castle({ params, viewMode }: CastleProps) {
   const portcullisRef = useRef<THREE.Group>(null);
   const barLatchRef = useRef<THREE.Group>(null);
   const setCastleGeometries = useCastleStore((state) => state.setCastleGeometries);
-  const [animProgress, setAnimProgress] = useState(0);
+  const uvMappingMode = useCastleStore((s) => s.uvMappingMode as UVMappingMode);
+  const showSeams = useCastleStore((s) => s.showSeams);
+  const [, setAnimProgress] = useState(0);
   const animTargetRef = useRef(0);
   const animCurrentRef = useRef(0);
 
@@ -35,42 +37,47 @@ export function Castle({ params, viewMode }: CastleProps) {
 
     result.walls.forEach((geo, i) => {
       const uvGeo = geo.clone();
-      const island = UVUnwrapper.unwrapGeometry(uvGeo, `wall_${i}`);
+      const island = UVUnwrapper.unwrapGeometry(uvGeo, `wall_${i}`, uvMappingMode);
       islands.push(island);
       uvGeos.push(uvGeo);
     });
     result.towers.forEach((geo, i) => {
       const uvGeo = geo.clone();
-      const island = UVUnwrapper.unwrapGeometry(uvGeo, `tower_${i}`);
+      const island = UVUnwrapper.unwrapGeometry(uvGeo, `tower_${i}`, uvMappingMode);
       islands.push(island);
       uvGeos.push(uvGeo);
     });
     const gateUvGeo = result.gate.clone();
-    islands.push(UVUnwrapper.unwrapGeometry(gateUvGeo, 'gate'));
+    islands.push(UVUnwrapper.unwrapGeometry(gateUvGeo, 'gate', uvMappingMode));
     uvGeos.push(gateUvGeo);
     if (result.gatehouse) {
       const gatehouseUvGeo = result.gatehouse.clone();
-      islands.push(UVUnwrapper.unwrapGeometry(gatehouseUvGeo, 'gatehouse'));
+      islands.push(UVUnwrapper.unwrapGeometry(gatehouseUvGeo, 'gatehouse', uvMappingMode));
       uvGeos.push(gatehouseUvGeo);
     }
     if (result.moat) {
       const moatUvGeo = result.moat.clone();
-      islands.push(UVUnwrapper.unwrapGeometry(moatUvGeo, 'moat'));
+      islands.push(UVUnwrapper.unwrapGeometry(moatUvGeo, 'moat', uvMappingMode));
       uvGeos.push(moatUvGeo);
     }
     result.buildings.forEach((geo, i) => {
       const uvGeo = geo.clone();
-      const island = UVUnwrapper.unwrapGeometry(uvGeo, `building_${i}`);
+      const island = UVUnwrapper.unwrapGeometry(uvGeo, `building_${i}`, uvMappingMode);
       islands.push(island);
       uvGeos.push(uvGeo);
     });
+    const groundUvGeo = result.ground.clone();
+    islands.push(UVUnwrapper.unwrapGeometry(groundUvGeo, 'ground', uvMappingMode));
+    uvGeos.push(groundUvGeo);
 
     UVUnwrapper.packIslands(islands, 0.02);
 
-    return { ...result, uvGeometries: uvGeos };
-  }, [params]);
+    const seamGeometry = UVUnwrapper.buildSeamLineSegments(islands);
 
-  const { walls, towers, gate, gatehouse, barLatch, moat, moatSegments, water, waterSegments, drawbridge, portcullis, buildings, buildingTypes, ground, uvGeometries } = generatorData;
+    return { ...result, uvGeometries: uvGeos, uvIslands: islands, seamGeometry };
+  }, [params, uvMappingMode]);
+
+  const { walls, towers, gate, gatehouse, barLatch, moat, moatSegments, water, waterSegments, drawbridge, portcullis, buildings, buildingTypes, ground, uvGeometries, seamGeometry } = generatorData;
 
   useEffect(() => {
     setCastleGeometries({
@@ -131,12 +138,17 @@ export function Castle({ params, viewMode }: CastleProps) {
         for (let i = 0; i < positions.count; i++) {
           const x = positions.getX(i);
           const z = positions.getZ(i);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const originalY = (positions as any)._originalY !== undefined
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             ? (positions as any)._originalY[i]
             : positions.getY(i);
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           if ((positions as any)._originalY === undefined) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (positions as any)._originalY = new Float32Array(positions.count);
           }
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (positions as any)._originalY[i] = originalY;
           const wave = Math.sin(x * 0.5 + time) * Math.cos(z * 0.5 + time * 0.7) * params.moatWaterParams.waveHeight;
           positions.setY(i, originalY + wave);
@@ -155,12 +167,17 @@ export function Castle({ params, viewMode }: CastleProps) {
             for (let i = 0; i < positions.count; i++) {
               const x = positions.getX(i);
               const z = positions.getZ(i);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const originalY = (positions as any)._originalY !== undefined
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 ? (positions as any)._originalY[i]
                 : positions.getY(i);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               if ((positions as any)._originalY === undefined) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 (positions as any)._originalY = new Float32Array(positions.count);
               }
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (positions as any)._originalY[i] = originalY;
               const wave = Math.sin(x * 0.5 + time) * Math.cos(z * 0.5 + time * 0.7) * params.moatWaterParams.waveHeight;
               positions.setY(i, originalY + wave);
@@ -175,26 +192,26 @@ export function Castle({ params, viewMode }: CastleProps) {
       const speed = 0.3;
       const target = params.drawbridgeAngle > 0 ? 1 : 0;
       animTargetRef.current = target;
-      
+
       const diff = animTargetRef.current - animCurrentRef.current;
       if (Math.abs(diff) > 0.001) {
         animCurrentRef.current += diff * speed * delta * 2;
         animCurrentRef.current = Math.max(0, Math.min(1, animCurrentRef.current));
         setAnimProgress(animCurrentRef.current);
       }
-      
+
       const p = animCurrentRef.current;
-      
+
       if (drawbridgeRef.current) {
         const bridgeAngle = Math.max(0, (p - 0.4) / 0.6) * 75;
         drawbridgeRef.current.rotation.x = -bridgeAngle * (Math.PI / 180);
       }
-      
+
       if (portcullisRef.current) {
         const portcullisP = Math.max(0, (p - 0.2) / 0.5);
         portcullisRef.current.position.y = portcullisP * params.gateHeight * 0.9;
       }
-      
+
       if (barLatchRef.current) {
         const latchP = Math.max(0, p / 0.2);
         barLatchRef.current.position.x = latchP * 1.5;
@@ -300,6 +317,19 @@ export function Castle({ params, viewMode }: CastleProps) {
     ));
   };
 
+  const renderGround = () => {
+    const idx = walls.length + towers.length + 1 + (gatehouse ? 1 : 0) + (moat ? 1 : 0) + buildings.length;
+    const geo = viewMode === 'uv' ? uvGeometries[idx] : ground;
+    return <mesh geometry={geo} material={getMaterial('ground')} receiveShadow name="ground" />;
+  };
+
+  const renderSeams = () => {
+    if (!showSeams || !seamGeometry) return null;
+    return (
+      <lineSegments geometry={seamGeometry} material={MaterialFactory.getSeamLineMaterial()} name="uv_seams" />
+    );
+  };
+
   return (
     <group ref={groupRef}>
       {renderWalls()}
@@ -314,7 +344,8 @@ export function Castle({ params, viewMode }: CastleProps) {
       {renderPortcullis()}
       {renderBarLatch()}
       {renderBuildings()}
-      <mesh geometry={ground} material={getMaterial('ground')} receiveShadow name="ground" />
+      {renderGround()}
+      {renderSeams()}
     </group>
   );
 }

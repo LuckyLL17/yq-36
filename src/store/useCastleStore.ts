@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WallStyle, WALL_STYLE_PRESETS, TowerType, DEFAULT_TOWER_PARAMS, DEFAULT_MOAT_WATER_PARAMS, MoatSegment, TowerSpecificParams, BuildingType } from '@/types/castle';
+import { CastleParams, CastleState, ViewMode, Room, Corridor, TerrainType, TERRAIN_PRESETS, WeatherType, WallStyle, WALL_STYLE_PRESETS, TowerType, DEFAULT_TOWER_PARAMS, DEFAULT_MOAT_WATER_PARAMS, MoatSegment, TowerSpecificParams, BuildingType, UVMappingMode } from '@/types/castle';
 import { getInterpolatedStyle } from '@/data/historicalEras';
 
 function generateDefaultMoatSegments(): MoatSegment[] {
@@ -200,6 +200,8 @@ export const useCastleStore = create<CastleState>((set, get) => ({
   },
   selectedNPCId: null,
   selectedNPCType: null,
+  uvMappingMode: 'auto' as UVMappingMode,
+  showSeams: false,
   setParams: (newParams) =>
     set((state) => ({
       params: { ...state.params, ...newParams },
@@ -478,5 +480,13 @@ export const useCastleStore = create<CastleState>((set, get) => ({
         drawbridgeAngle: 0,
         gateAnimationSync: true,
       },
+    })),
+  setUVMappingMode: (mode: UVMappingMode) =>
+    set(() => ({
+      uvMappingMode: mode,
+    })),
+  toggleShowSeams: () =>
+    set((state) => ({
+      showSeams: !state.showSeams,
     })),
 }));

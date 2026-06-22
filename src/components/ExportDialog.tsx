@@ -47,8 +47,7 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
 
     UVUnwrapper.packIslands(islands, 0.02);
 
-    const geometries = islands.map((island) => island.geometry);
-    const canvas = UVUnwrapper.generateUVPreview(geometries, 256);
+    const canvas = UVUnwrapper.generateUVPreview(islands, 256);
     
     return {
       uvPreviewUrl: canvas.toDataURL(),

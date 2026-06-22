@@ -7,6 +7,7 @@ export class MaterialFactory {
   private static waterTexture: THREE.CanvasTexture | null = null;
   private static roofTexture: THREE.CanvasTexture | null = null;
   private static checkerboardTexture: THREE.Texture | null = null;
+  private static seamTexture: THREE.Texture | null = null;
 
   static getStoneMaterial(wireframe: boolean = false, style: WallStyle = 'medieval'): THREE.MeshStandardMaterial {
     if (!this.stoneTextures.has(style)) {
@@ -99,6 +100,65 @@ export class MaterialFactory {
     return new THREE.MeshBasicMaterial({
       color: 0x00ff00,
       wireframe: true,
+    });
+  }
+
+  static getSeamLineMaterial(): THREE.LineBasicMaterial {
+    return new THREE.LineBasicMaterial({
+      color: 0xff00ff,
+      linewidth: 2,
+      transparent: true,
+      opacity: 0.9,
+      depthTest: false,
+    });
+  }
+
+  static getSeamVertexMaterial(): THREE.PointsMaterial {
+    return new THREE.PointsMaterial({
+      color: 0xffff00,
+      size: 0.15,
+      sizeAttenuation: true,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+    });
+  }
+
+  static getSeamOverlayMaterial(): THREE.MeshBasicMaterial {
+    if (!this.seamTexture) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d')!;
+      const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+      gradient.addColorStop(0, 'rgba(255, 0, 255, 0.4)');
+      gradient.addColorStop(0.7, 'rgba(255, 100, 255, 0.2)');
+      gradient.addColorStop(1, 'rgba(255, 150, 255, 0.05)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 256, 256);
+      ctx.strokeStyle = 'rgba(255, 0, 255, 0.6)';
+      ctx.lineWidth = 4;
+      for (let i = 0; i < 256; i += 16) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, 256);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(256, i);
+        ctx.stroke();
+      }
+      this.seamTexture = new THREE.CanvasTexture(canvas);
+      this.seamTexture.wrapS = THREE.RepeatWrapping;
+      this.seamTexture.wrapT = THREE.RepeatWrapping;
+    }
+    return new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      map: this.seamTexture,
+      transparent: true,
+      opacity: 0.5,
+      side: THREE.DoubleSide,
+      depthWrite: false,
     });
   }
 

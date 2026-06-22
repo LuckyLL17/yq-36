@@ -414,6 +414,40 @@ export interface CastleMeshData {
 
 export type ViewMode = 'solid' | 'wireframe' | 'uv' | 'interior';
 
+export type UVMappingMode = 'auto' | 'planar' | 'cylindrical' | 'cubic';
+
+export const UV_MAPPING_MODES: Record<UVMappingMode, { name: string; icon: string; description: string }> = {
+  auto: {
+    name: '自动法线',
+    icon: '🔄',
+    description: '根据法线方向自动选择最佳投影面',
+  },
+  planar: {
+    name: '平面映射',
+    icon: '📐',
+    description: '沿指定轴向平面投影，适合扁平物体',
+  },
+  cylindrical: {
+    name: '柱面映射',
+    icon: '🥫',
+    description: '沿Y轴圆柱投影，适合塔楼等柱状物体',
+  },
+  cubic: {
+    name: '立方体贴图',
+    icon: '🎲',
+    description: '六面投影展开，适合方盒类物体',
+  },
+};
+
+export interface SeamEdge {
+  start: [number, number, number];
+  end: [number, number, number];
+  uvStartU: number;
+  uvStartV: number;
+  uvEndU: number;
+  uvEndV: number;
+}
+
 export type RoomType = 'hall' | 'bedroom' | 'kitchen' | 'armory' | 'church' | 'dungeon' | 'library' | 'garden';
 
 export interface Room {
@@ -457,6 +491,8 @@ export interface CastleState {
   interiorLayout: InteriorLayout;
   selectedNPCId: string | null;
   selectedNPCType: NPCType | null;
+  uvMappingMode: UVMappingMode;
+  showSeams: boolean;
   setParams: (params: Partial<CastleParams>) => void;
   setViewMode: (mode: ViewMode) => void;
   setCastleGeometries: (geometries: CastleMeshData | null) => void;
@@ -488,4 +524,6 @@ export interface CastleState {
   toggleGateAnimationSync: () => void;
   openGateSequence: () => void;
   closeGateSequence: () => void;
+  setUVMappingMode: (mode: UVMappingMode) => void;
+  toggleShowSeams: () => void;
 }

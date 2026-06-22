@@ -1,4 +1,4 @@
-import { Download, Grid3X3, Box, Shuffle, RotateCcw, Eye, Swords, LayoutGrid, Shield } from 'lucide-react';
+import { Download, Grid3X3, Box, Shuffle, RotateCcw, Eye, Swords, LayoutGrid, Shield, Scissors } from 'lucide-react';
 import { useCastleStore } from '@/store/useCastleStore';
 import { useHeraldryStore } from '@/store/useHeraldryStore';
 import { ViewMode } from '@/types/castle';
@@ -11,7 +11,7 @@ interface ToolbarProps {
 }
 
 export function Toolbar({ onExport, siegeMode, onToggleSiegeMode }: ToolbarProps) {
-  const { viewMode, setViewMode, resetParams, randomizeSeed } = useCastleStore();
+  const { viewMode, setViewMode, resetParams, randomizeSeed, showSeams, toggleShowSeams } = useCastleStore();
   const { showPanel, togglePanel, config } = useHeraldryStore();
 
   const viewModes: { mode: ViewMode; label: string; icon: React.ReactNode }[] = [
@@ -71,6 +71,22 @@ export function Toolbar({ onExport, siegeMode, onToggleSiegeMode }: ToolbarProps
             <span className="hidden sm:inline">{label}</span>
           </button>
         ))}
+      </div>
+
+      <div className="flex items-center gap-0.5 px-2 border-r border-stone-700">
+        <button
+          onClick={toggleShowSeams}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium transition-all',
+            showSeams
+              ? 'bg-fuchsia-600 text-white shadow-lg shadow-fuchsia-600/30'
+              : 'text-stone-400 hover:text-fuchsia-400 hover:bg-stone-800'
+          )}
+          title="显示UV接缝"
+        >
+          <Scissors className="w-4 h-4" />
+          <span className="hidden sm:inline">接缝</span>
+        </button>
       </div>
 
       <div className="flex items-center gap-0.5 px-2 border-r border-stone-700">
